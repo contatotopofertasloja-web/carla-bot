@@ -26,7 +26,7 @@ app.post('/webhook', withRateLimit({ windowMs: 3000 }), async (req, res) => {
   }
 });
 const port = Number(process.env.PORT || 8080);
-const host = process.env.HOST || '0.0.0.0'; // na nuvem precisa 0.0.0.0
+const host = process.env.HOST || '0.0.0.0'; // ajuste para rodar na nuvem
 
 const server = app.listen(port, host, () => {
   console.log(`[HTTP] Listening on ${host}:${port}`);
