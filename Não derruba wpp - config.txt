@@ -1,0 +1,40 @@
+Localmente, o WPP_AUTH_DIR=./.wpp-auth funciona tranquilo, porque ele cria a pastinha na raiz do projeto.
+
+Mas no Railway, se deixar assim, cada rebuild zera a sessão → e aí o WhatsApp cai e você teria que escanear o QR de novo.
+
+✅ Para evitar isso, precisa trocar só no ambiente da Railway (não precisa mudar no local):
+
+No Railway, configure em Variables:
+
+WPP_AUTH_DIR=/app/baileys-auth
+
+
+E em Volumes:
+
+Cria um volume persistente com o path /app/baileys-auth.
+
+Assim:
+
+Local → continua usando ./.wpp-auth.
+
+Railway → mantém a sessão salva no volume /app/baileys-auth, mesmo após rebuild.
+
+👉 Quer que eu te passe o passo a passo de como configurar esse volume persistente no painel do Railway antes de subir essa nova versão?
+
+Você disse:
+sim
+O ChatGPT disse:
+
+Bora fazer passo a passo (uma etapa por vez).
+
+Etapa 1 — Criar e montar o Volume persistente no Railway
+
+Abra seu projeto no Railway → aba “Settings” do serviço que roda a Carla.
+
+Vá em “Persistent Storage / Volumes” → clique em “Add Volume”.
+
+Mount path: digite exatamente /app/baileys-auth (com barra no início).
+
+Confirme/Salve. O volume deve aparecer listado e anexado ao mesmo serviço.
+
+Me diga “Etapa 1 ok” quando terminar, e eu mando a Etapa 2 (variável WPP_AUTH_DIR no Railway).

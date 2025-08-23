@@ -1,0 +1,229 @@
+
+
+ Resumo Completo + Prompts do Projeto Carla
+
+“A Carla foi inicialmente configurada e testada no computador local via CMD, e só depois enviada para o Railway. Diferente da primeira versão da Lívia (que subimos direto pelo GitHub), a Carla foi toda preparada localmente antes do deploy.”
+Utilizamos muito o bat para alterar os arquivos e utilizamos o VS Code para a criação dos arquivos de forma organizada.
+
+Abaixo está todo o histórico da configuração da Carla, nosso robô baseado em GPT integrado ao WhatsApp com Baileys, conectado à Railway e com simulação de comportamento humano.
+
+---
+
+ 1. Objetivo do Projeto Carla
+
+> Criar um robô inteligente para vendas via WhatsApp, com:
+
+ Atendimento natural e persuasivo.
+ Integração com WhatsApp via Baileys.
+ Configuração para persistir a sessão (não precisar escanear QR toda vez).
+ Persona convincente para gerar confiança e conversão.
+ Deploy na Railway para manter ativo 24/7.
+ Modelo GPT mais atual possível para respostas mais humanas.
+
+---
+
+ 2. Persona da Carla
+
+ Nome: Carla
+ Aparência: Morena, cabelos lisos, estilo autêntico e confiante.
+ Tom de voz:
+
+   Amigável, simpática e próxima.
+   Passa segurança sobre o produto e experiência própria.
+ História: Carla usa a Progressiva Vegetal Premium há meses, adora os resultados e recomenda para amigas.
+ Informações sobre o produto:
+
+   Preço atual: R\$ 170
+   Contém 500ml e dura até 3 meses.
+   Produto premium, sem formol e com acabamento profissional.
+
+---
+
+ 3. Estrutura do Projeto
+
+ 3.1. Divisão dos Arquivos
+
+ Servidor Express → controla as rotas da Carla.
+ Fluxo de conversa → mensagens personalizadas para vendas.
+ Memória → histórico de conversas para manter contexto por 7 dias.
+ Persistência da sessão WhatsApp → `.wpp-auth` (local) e `/app/baileys-auth` (Railway).
+ Prompts dinâmicos → adaptam tom, persona e informações do produto.
+
+ 3.2. Ambiente `.env`
+
+ OPENAI\_API\_KEY → chave do GPT.
+ MODEL\_NAME → modelo GPT usado (mais atual possível).
+ PRICE\_TARGET → preço alvo do produto.
+ WPP\_AUTH\_DIR → onde salvar a sessão do WhatsApp.
+ MEMORY\_TTL\_DAYS → 7 dias de histórico por usuário.
+ PORT → 8080 para rodar local e Railway.
+
+---
+
+ 4. Instalação e Configuração
+
+ 4.1. Configurar NVM para múltiplas versões do Node
+
+ Instalamos o NVM (Node Version Manager).
+ Mantivemos:
+
+   Node 18.20.4 → para lidar com o Baileys (compatível e estável).
+   Node 20+ → para rodar a API e o GPT, se necessário.
+
+> Prompt:
+> "Configurei o NVM no Windows para poder alternar entre Node 18 e Node 20. Node 18 será usado para o Baileys (WhatsApp) e Node 20 para o GPT caso seja necessário."
+
+---
+
+ 4.2. Instalar dependências
+
+ Express → servidor HTTP.
+ Baileys → integração com WhatsApp.
+ QRCode → exibir QR para pareamento.
+ Dotenv → gerenciar variáveis de ambiente.
+ OpenAI → GPT.
+
+> Prompt:
+> "Instalei todas as dependências essenciais: Express, Baileys, QRCode, Dotenv e OpenAI para que a Carla funcione integrada ao WhatsApp e GPT."
+
+---
+
+ 5. Integração com o WhatsApp
+
+ 5.1. Persistência de Sessão
+
+ Configuramos a Carla para manter a sessão salva localmente (`.wpp-auth`).
+ No deploy, usamos volume `/app/baileys-auth` para que a Railway também não perca a sessão.
+
+> Prompt:
+> "Configurar persistência do WhatsApp para que a Carla não perca a conexão, evitando escanear QR sempre."
+
+---
+
+ 5.2. Pareamento com QR
+
+ Acessamos `http://127.0.0.1:8080/wpp/qr`.
+ Atualizamos a página a cada 2–3 segundos até o QR aparecer.
+ Escaneamos o QR com o WhatsApp > Dispositivos conectados.
+
+> Prompt:
+> "Abrir rota `/wpp/qr`, atualizar até o QR aparecer e escanear com o celular para parear o WhatsApp da Carla."
+
+---
+
+ 5.3. Simulação de comportamento humano
+
+Para deixar a Carla mais natural:
+
+ "Digitando…" → antes de responder, a Carla envia presença “composing” e aguarda um tempo proporcional ao tamanho da resposta.
+ Mensagens lidas → configuramos para marcar como lida automaticamente.
+
+> Prompt:
+> "Simular comportamento humano: Carla aparece como 'digitando...' antes de responder e marca mensagens como lidas automaticamente."
+
+---
+
+ 6. Deploy na Railway
+
+ Subimos o projeto para o GitHub.
+ Configuramos o deploy automático na Railway.
+ Ajustamos:
+
+   PORT=8080
+   HOST=0.0.0.0
+   Volume persistente → `/app/baileys-auth`
+   Variáveis de ambiente → MODEL\_NAME, OPENAI\_API\_KEY, PRICE\_TARGET, MEMORY\_TTL\_DAYS.
+
+> Prompt:
+> "Deploy da Carla feito na Railway com volume persistente e variáveis configuradas para manter a sessão e rodar o GPT mais atual."
+
+---
+
+ 7. Testes Realizados
+
+ ✅ Teste de conexão local (`/health`) → OK.
+ ✅ Teste do QR → OK.
+ ✅ Teste de envio e recebimento de mensagens → OK.
+ ✅ Teste do Webhook:
+
+```json
+{
+  "userId": "c001",
+  "text": "Oi, Carla!",
+  "context": {}
+}
+```
+
+→ Carla responde com pitch de venda natural.
+
+> Prompt:
+> "Validei a Carla enviando mensagens reais via WhatsApp e via Webhook, confirmando respostas personalizadas."
+
+---
+
+ 8. Adaptação do GPT
+
+ Atualizamos o modelo para GPT mais atual (`gpt-4o` ou `gpt-5-large`, conforme disponível).
+ Resultado: Carla responde mais rápido, com textos fluidos, naturais e humanos.
+
+> Prompt:
+> "Carla configurada para rodar com o GPT mais atual disponível, garantindo melhor qualidade de resposta."
+
+---
+
+ 9. Estratégias de Conversão
+
+ Carla conduz o lead pelo funil:
+
+  1. Saudação calorosa.
+  2. Identificação de necessidades.
+  3. Explicação clara dos benefícios.
+  4. Oferta e gatilhos mentais.
+  5. Encaminha para o link de checkout.
+ Mantém memória por 7 dias → evita repetir informações.
+
+> Prompt:
+> "Carla possui fluxo de vendas otimizado com etapas claras para converter mais leads, usando empatia, prova social e oferta irresistível."
+
+---
+
+ 10. Status Final da Carla
+
+ ✅ Conectada ao WhatsApp.
+ ✅ Sessão persistente.
+ ✅ Persona definida e humanizada.
+ ✅ GPT atualizado.
+ ✅ Deploy estável na Railway.
+ ✅ Comportamento natural (digitando, lido).
+ ✅ Memória leve de 7 dias.
+ ✅ Produto configurado: Progressiva Vegetal Premium.
+
+---
+
+ 11. Próximos Passos
+
+ Criar log de cliques e conversões.
+ A/B testing com preços diferentes.
+ Treinar múltiplas personas (ex.: Carla + Lívia para comparação).
+ Centralizar estatísticas de vendas em dashboard.
+
+---
+
+ Pacote de Prompts do Projeto Carla
+
+1. Prompt — Persona
+   "Defina a Carla como uma vendedora real, morena de cabelos lisos, simpática e empática. Ela usa a Progressiva Vegetal Premium, conhece o produto, e fala com tom próximo e natural."
+
+2. Prompt — Produto
+   "A Progressiva Vegetal Premium custa R\$ 170, vem com 500ml e dura até 3 meses. O produto é premium, sem formol e com acabamento profissional."
+
+3. Prompt — Conversão
+   "Carla deve conduzir o cliente com um fluxo natural de vendas: cumprimentar, identificar necessidades, apresentar benefícios, criar urgência e oferecer o link de compra."
+
+4. Prompt — Comportamento Humano
+   "Carla deve simular que está digitando antes de responder e marcar mensagens como lidas para parecer mais humana."
+
+5. Prompt — GPT Atual
+   "Configure o modelo da Carla para usar sempre o GPT mais atual disponível, garantindo respostas rápidas, fluidas e humanas."
+
+---
