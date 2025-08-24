@@ -25,15 +25,22 @@ app.get('/__routes', (_req, res) => {
 
 // Healthcheck
 app.get('/health', (_req, res) => res.json({ ok: true }));
-
-// Modelo GPT ativo
+// Modelo GPT ativo (força default = gpt-4o se não tiver variável)
 app.get('/gpt-model', (_req, res) => {
+  const effectiveModel = (process.env.MODEL_NAME && process.env.MODEL_NAME.trim())
+    ? process.env.MODEL_NAME.trim()
+    : 'gpt-4o';
+
+  // garante que o process.env usado no bot também esteja certo
+  process.env.MODEL_NAME = effectiveModel;
+
   res.json({
-    model: process.env.MODEL_NAME || 'default',
+    model: effectiveModel,
     node: process.version,
     env: process.env.NODE_ENV || 'dev'
   });
 });
+
 
 // QR do WhatsApp (opcional token via ?token=...)
 app.get('/wpp/qr', async (req, res) => {
