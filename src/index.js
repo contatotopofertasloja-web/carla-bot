@@ -4,6 +4,7 @@ import express from 'express';
 import { withRateLimit } from './middlewares/rateLimit.js';
 import { bot } from './bot.js';
 import { startBaileys, getQrDataURL, isWppReady } from './wpp.js';
+import { EFFECTIVE_MODEL } from './model.js';
 
 const app = express();
 
@@ -25,21 +26,16 @@ app.get('/__routes', (_req, res) => {
 
 // Healthcheck
 app.get('/health', (_req, res) => res.json({ ok: true }));
-// Modelo GPT ativo (força default = gpt-4o se não tiver variável)
+// Modelo GPT ativo (mostra env e o efetivo usado pelo bot)
 app.get('/gpt-model', (_req, res) => {
-  const effectiveModel = (process.env.MODEL_NAME && process.env.MODEL_NAME.trim())
-    ? process.env.MODEL_NAME.trim()
-    : 'gpt-4o';
-
-  // garante que o process.env usado no bot também esteja certo
-  process.env.MODEL_NAME = effectiveModel;
-
   res.json({
-    model: effectiveModel,
+    env_model: (process.env.MODEL_NAME || '').trim() || null,
+    effective_model: EFFECTIVE_MODEL,
     node: process.version,
     env: process.env.NODE_ENV || 'dev'
   });
 });
+
 
 
 // QR do WhatsApp (opcional token via ?token=...)
