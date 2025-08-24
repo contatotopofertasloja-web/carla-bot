@@ -14,6 +14,17 @@ const app = express();
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true }));
 
+// debug rápido: ver se novas rotas aparecem
+app.get('/__ping', (_req, res) => res.type('text').send('pong'));
+
+app.get('/__routes', (_req, res) => {
+  const list = [];
+  app._router?.stack?.forEach((r) => {
+    if (r.route && r.route.path) list.push(`${Object.keys(r.route.methods).join(',').toUpperCase()} ${r.route.path}`);
+  });
+  res.json(list);
+});
+
 // Healthcheck
 app.get('/health', (_req, res) => {
   res.json({ ok: true });
