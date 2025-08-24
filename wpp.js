@@ -1,8 +1,7 @@
-// src/wpp.js — Node 18 compat (WebCrypto) + Baileys + typing + readMessages + smartSend + mídia
+// src/wpp.js — Node 18 compat (WebCrypto) + Baileys + typing + readMessages
 import { webcrypto } from 'crypto';
 import qrcode from 'qrcode';
 import fs from 'fs';
-import { smartSend } from './utils/smartSend.js';
 
 // ---- Typing helpers ----
 const msPerChar = Number(process.env.TYPING_MS_PER_CHAR || 35); // ms por caractere
@@ -36,19 +35,6 @@ function extractText(msgWrap) {
     msg?.imageMessage?.caption ||
     msg?.videoMessage?.caption ||
     ''
-  );
-}
-
-// Detecta se a mensagem contém mídia (áudio/foto/vídeo/doc/sticker/view-once)
-function isMedia(msgWrap) {
-  const m = msgWrap?.message || {};
-  return Boolean(
-    m.audioMessage ||
-    m.imageMessage ||
-    m.videoMessage ||
-    m.documentMessage ||
-    m.stickerMessage ||
-    m.viewOnceMessage
   );
 }
 
@@ -105,24 +91,19 @@ export async function startBaileys({ onMessage }) {
           if (!m?.message || m?.key?.fromMe) continue;
 
           const from = m.key.remoteJid;
-          const text = (extractText(m) || '').trim();
-          const hasMedia = isMedia(m);
+          const text = extractText(m).trim();
+          if (!text) continue;
 
-          // Se não houver texto nem mídia, ignora
-          if (!text && !hasMedia) continue;
-
-          console.log(`[MSG] ${from}: ${text || '[mídia]'}`);
+          console.log(`[MSG] ${from}: ${text}`);
 
           // marca como lida (quando aplicável)
           try { await sock.readMessages([m.key]); } catch {}
 
           if (typeof onMessage === 'function') {
-            // Passa contexto com flag de mídia
-            const reply = await onMessage({ from, text, raw: m, context: { hasMedia } });
+            const reply = await onMessage({ from, text, raw: m });
             if (reply && sock) {
-              await simulateTyping(sock, from, String(reply));
-              // smartSend envia imagem se houver o comando [ENVIAR_FOTO_PRODUTO:...], senão envia texto
-              await smartSend(sock, from, String(reply));
+              await simulateTyping(sock, from, reply);
+              await sock.sendMessage(from, { text: String(reply) });
             }
           }
         } catch (innerErr) {

@@ -1,6 +1,6 @@
 // src/bot.js
 import { getMemory, setMemory } from './memory.js';
-import prompts from './prompts/base.js';              // adapter (default export)
+import prompts from './prompts/base.js';              // <-- usa o adapter (default export)
 import { productPrompt } from './prompts/product.js';
 import { greet } from './flows/greet.js';
 import { qualify } from './flows/qualify.js';
@@ -20,7 +20,7 @@ function pick(arr = []) {
 
 function textIndicaMidia(text = '') {
   // Heurística: usuário dizendo que mandou mídia
-  const re = /(te?\s*(mandei|enviei)|segue|acabei de\s*(mandar|enviar)).*(foto|imagem|áudio|audio|vídeo|video|documento|arquivo)/i;
+  const re = /(te? (mandei|enviei)|segue|acabei de (mandar|enviar)).*(foto|imagem|áudio|audio|vídeo|video|documento|arquivo)/i;
   return re.test(text);
 }
 
@@ -42,7 +42,7 @@ function legendaFotoAbertura() {
 }
 
 // Gera comando especial para o transport converter em imagem real
-// Formato: [ENVIAR_FOTO_PRODUTO:LEGENDA AQUI]
+// Formato: [ENVIAR_FOTO_PRODUTO:LEGEND AQUI]
 function comandoFotoAbertura() {
   const legenda = legendaFotoAbertura();
   return `[ENVIAR_FOTO_PRODUTO:${legenda}]`;
@@ -90,7 +90,7 @@ export const bot = {
 
       // 2) Foto automática na abertura da conversa (uma vez por usuário, por persistência)
       //    Enviamos SEMPRE quando for a primeira interação (mem.welcomed falsy).
-      //    O transport (smartSend) converte [ENVIAR_FOTO_PRODUTO:...] em imagem real com legenda.
+      //    O transport deve converter o comando [ENVIAR_FOTO_PRODUTO:...] em imagem real com legenda.
       let prefixoFoto = '';
       if (!jaEnviouFotoAbertura) {
         prefixoFoto = comandoFotoAbertura() + '\n';
