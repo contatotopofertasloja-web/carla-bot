@@ -4,9 +4,6 @@ import express from 'express';
 import { withRateLimit } from './middlewares/rateLimit.js';
 import { bot } from './bot.js';
 import { startBaileys, getQrDataURL, isWppReady } from './wpp.js';
-// --- QR support (coloque perto das outras imports) ---
-
-
 
 const app = express();
 
@@ -14,53 +11,52 @@ const app = express();
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// debug rápido: ver se novas rotas aparecem
+// Debug rápido
 app.get('/__ping', (_req, res) => res.type('text').send('pong'));
-
 app.get('/__routes', (_req, res) => {
   const list = [];
   app._router?.stack?.forEach((r) => {
-    if (r.route && r.route.path) list.push(`${Object.keys(r.route.methods).join(',').toUpperCase()} ${r.route.path}`);
+    if (r.route && r.route.path) {
+      list.push(`${Object.keys(r.route.methods).join(',').toUpperCase()} ${r.route.path}`);
+    }
   });
   res.json(list);
 });
 
 // Healthcheck
-app.get('/health', (_req, res) => {
-  res.json({ ok: true });
-});
+app.get('/health', (_req, res) => res.json({ ok: true }));
 
-// QR do WhatsApp (HTML simples) — opcional token via query (?token=...)
+// QR do WhatsApp (opcional token via ?token=...)
 app.get('/wpp/qr', async (req, res) => {
   try {
     const token = process.env.WEBHOOK_TOKEN || '';
     if (token && req.query.token !== token) {
-      res.status(401).send('unauthorized');
-      return;
+      return res.status(401).send('unauthorized');
     }
 
     if (isWppReady()) {
-      res.type('text').send('WPP já conectado ✅');
-      return;
+      return res.type('text').send('WPP já conectado ✅');
     }
 
     const dataUrl = await getQrDataURL();
     if (!dataUrl) {
-      res.type('text').send('Aguardando QR ser gerado... atualize em 2–3s');
-      return;
+      return res.type('text').send('Aguardando QR ser gerado... atualize em 2–3s');
     }
 
-    const html = `
-      <html><body>
+    res.type('html').send(`
+      <html><body style="font-family:sans-serif">
         <h3>Escaneie o QR no WhatsApp &gt; Dispositivos conectados</h3>
         <img src="${dataUrl}" style="width:300px;height:300px" />
-      </body></html>`;
-    res.type('html').send(html);
+      </body></html>
+    `);
   } catch (e) {
     console.error('[WPP][QR][ERR]', e);
     res.status(500).send('erro ao gerar QR');
   }
 });
+
+// Alias opcional
+app.get('/qr', (_req, res) => res.redirect(302, '/wpp/qr'));
 
 // Webhook universal (compatível com seu formato e Meta-like)
 app.post('/webhook', withRateLimit({ windowMs: 3000 }), async (req, res) => {
@@ -84,8 +80,7 @@ app.post('/webhook', withRateLimit({ windowMs: 3000 }), async (req, res) => {
     }
 
     if (!userId || !String(text).trim()) {
-      res.status(400).json({ error: 'invalid payload', got: req.body });
-      return;
+      return res.status(400).json({ error: 'invalid payload', got: req.body });
     }
 
     const reply = await bot.handleMessage({ userId, text, context });
