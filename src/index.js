@@ -26,6 +26,15 @@ app.get('/__routes', (_req, res) => {
 // Healthcheck
 app.get('/health', (_req, res) => res.json({ ok: true }));
 
+// Modelo GPT ativo
+app.get('/gpt-model', (_req, res) => {
+  res.json({
+    model: process.env.MODEL_NAME || 'default',
+    node: process.version,
+    env: process.env.NODE_ENV || 'dev'
+  });
+});
+
 // QR do WhatsApp (opcional token via ?token=...)
 app.get('/wpp/qr', async (req, res) => {
   try {
