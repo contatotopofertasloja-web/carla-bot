@@ -105,7 +105,7 @@ app.post('/webhook', withRateLimit({ windowMs: 3000 }), async (req, res) => {
 
 // Start HTTP (local: 127.0.0.1; na Railway use HOST=0.0.0.0)
 const port = Number(process.env.PORT || 8080);
-const host = process.env.HOST || '127.0.0.1';
+const host = process.env.HOST || '0.0.0.0';
 const server = app.listen(port, host, () => {
   console.log(`[HTTP] Listening on ${host}:${port}`);
 });
