@@ -1,4 +1,4 @@
-// src/flows/close.js — versão completão refinada
+// src/flows/close.js — versão completão refinada (preço + link em 2 msgs, sem pedir link)
 import { model } from '../model.js';
 import { logEvent } from '../telemetry.js';
 import { getMemory, setMemory } from '../memory.js';
@@ -90,13 +90,13 @@ export async function closeDeal({ text, context, prompts, productPrompt, price =
     return polishReply(safe || reply, { closingHint: 'close' });
   }
 
-  // 5) Se tem intenção clara → manda preço + depois o link
+  // 5) Se tem intenção clara → manda preço + DEPOIS o link (duas mensagens)
   const precoLinha = `Aproveite: de R$197 por R$${price}, com pagamento só na entrega (COD) e entrega rápida.`;
   const reply1 = `${precoLinha} ${getRandomClosingQuestion('close')}`;
   const reply2 = `👉 Link oficial: ${CHECKOUT_LINK}`;
 
   logEvent({ userId, event: 'checkout_enviado', payload: { link: CHECKOUT_LINK } });
 
-  // devolve em duas mensagens sequenciais
+  // retorna em duas mensagens sequenciais
   return [ polishReply(reply1, { closingHint: 'close' }), reply2 ];
 }
