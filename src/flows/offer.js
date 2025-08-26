@@ -1,4 +1,4 @@
-// src/flows/offer.js — patch final completão
+// src/flows/offer.js — versão completão refinada
 import { model } from '../model.js';
 import { logEvent } from '../telemetry.js';
 import { getMemory, setMemory } from '../memory.js';
@@ -8,8 +8,7 @@ const PRICE_ORIGINAL = Number(process.env.PRICE_ORIGINAL || 197);
 const PRICE_PROMO    = Number(process.env.PRICE_TARGET   || 170);
 const ANTI_DUP_TTL_MS = 2 * 60 * 1000;
 
-// -----------------------------------------------------------------------------
-// Helpers
+// ----------------- Helpers -----------------
 function oneQuestionOnly(answer = '') {
   const s = String(answer || '');
   const parts = s.split('?');
@@ -37,78 +36,52 @@ async function filterDuplicateReply(userId, reply, key = 'lastOfferReply') {
   return reply;
 }
 
-// -----------------------------------------------------------------------------
-// Detectores
-function isOffensive(text = '') {
-  return /(vai se f|merda|porra|caralh|burra|idiot|otári|imbecil)/i.test(text.toLowerCase());
-}
-function isDuvidaVaga(text = '') {
-  return /(não sei|nao sei|será que|sera que|tenho dúvida|tenho duvida)/i.test(text.toLowerCase());
-}
-function isObjectionFunciona(text = '') {
-  return /(funciona|funcionar)/i.test(text.toLowerCase());
-}
-function isObjectionEstraga(text = '') {
-  return /(estraga|danifica|cair.*cabelo|quebra.*cabelo|resseca)/i.test(text.toLowerCase());
-}
-function isObjectionAnvisa(text = '') {
-  return /(anvisa|autorizado|registro.*anvisa|liberado)/i.test(text.toLowerCase());
-}
-function isAskHowToUse(text = '') {
-  return /(como usa|como utilizar|modo de uso|passo a passo|aplicar|aplicação)/i.test(text.toLowerCase());
-}
-function isAskDifferential(text = '') {
-  return /(diferencial|por que melhor|o que tem de diferente|diferença)/i.test(text.toLowerCase());
-}
-function isAskMl(text = '') {
-  return /(quantos ml|quantidade|ml tem)/i.test(text.toLowerCase());
-}
-function isAskDuracao(text = '') {
-  return /(quanto dura|duração|tempo dura|meses)/i.test(text.toLowerCase());
-}
-function isDiscountOrKit(text = '') {
-  return /(desconto|promoção|promo|levar dois|kit|família|family)/i.test(text.toLowerCase());
-}
+// ----------------- Detectores -----------------
+function isOffensive(t = '')     { return /(vai se f|merda|porra|caralh|burra|idiot|otári|imbecil)/i.test(t.toLowerCase()); }
+function isDuvidaVaga(t = '')    { return /(não sei|nao sei|será que|tenho dúvida|tenho duvida)/i.test(t.toLowerCase()); }
+function isObjectionFunciona(t=''){ return /(funciona|funcionar)/i.test(t.toLowerCase()); }
+function isObjectionEstraga(t=''){ return /(estraga|danifica|cair.*cabelo|quebra.*cabelo|resseca)/i.test(t.toLowerCase()); }
+function isObjectionAnvisa(t='') { return /(anvisa|autorizado|registro.*anvisa|liberado)/i.test(t.toLowerCase()); }
+function isAskHowToUse(t='')     { return /(como usa|como utilizar|modo de uso|passo a passo|aplicar|aplicação)/i.test(t.toLowerCase()); }
+function isAskDifferential(t=''){ return /(diferencial|por que melhor|o que tem de diferente|diferença)/i.test(t.toLowerCase()); }
+function isAskMl(t='')           { return /(quantos ml|quantidade|ml tem)/i.test(t.toLowerCase()); }
+function isAskDuracao(t='')      { return /(quanto dura|duração|tempo dura|meses)/i.test(t.toLowerCase()); }
+function isDiscountOrKit(t='')   { return /(desconto|promoção|promo|levar dois|kit|família|family)/i.test(t.toLowerCase()); }
 
-// -----------------------------------------------------------------------------
-// Flow principal
+// ----------------- Flow principal -----------------
 export async function offer({ text, context, prompts, productPrompt, price = PRICE_PROMO }) {
   const userMsgRaw = (text || '').trim();
   const userId     = (context && context.userId) || 'unknown';
 
   // 0) Ofensa
   if (isOffensive(userMsgRaw)) {
-    const reply = 'Entendo que você possa estar chateada 💕. Se preferir, podemos encerrar por aqui. Se quiser conversar sobre o produto em outro momento, estarei aqui pra te ajudar. Tudo bem?';
+    const reply = 'Entendo que você possa estar chateada 💕. Se preferir, podemos encerrar por aqui. Se quiser conversar sobre o produto em outro momento, estarei aqui pra te ajudar.';
     logEvent({ userId, event: 'ofensa_detectada', payload: { stage: 'offer' } });
     return polishReply(reply, { closingHint: 'offer' });
   }
 
   // 1) Dúvida vaga
   if (isDuvidaVaga(userMsgRaw)) {
-    const reply = `Eu entendo sua dúvida 💕. Pode ficar tranquila: é seguro, sem formol, e você só paga quando receber (COD). Hoje está de R$ ${PRICE_ORIGINAL} por R$ ${PRICE_PROMO}. Quer que eu te mostre depoimentos reais de clientes?`;
-    const safe = await filterDuplicateReply(userId, reply);
+    const reply = `Eu entendo sua dúvida 💕. Pode ficar tranquila: é seguro, sem formol, e você só paga quando receber (COD). Quer que eu te mostre depoimentos reais de clientes?`;
     logEvent({ userId, event: 'objection_tratada', payload: { tipo: 'duvida_vaga' } });
-    return polishReply(safe || reply, { closingHint: 'offer' });
+    return polishReply(await filterDuplicateReply(userId, reply) || reply, { closingHint: 'offer' });
   }
 
   // 2) Objeções clássicas
   if (isObjectionFunciona(userMsgRaw)) {
-    const reply = 'Sim, funciona de verdade 💕. Ele reduz o frizz e deixa o cabelo alinhado com acabamento natural — muitas clientes mandam fotos depois. Quer que eu te explique como aplicar pra potencializar o efeito?';
-    const safe = await filterDuplicateReply(userId, reply);
+    const reply = 'Sim, funciona de verdade 💕. Ele reduz o frizz e deixa o cabelo alinhado com acabamento natural. Quer que eu te explique como aplicar pra potencializar o efeito?';
     logEvent({ userId, event: 'objection_tratada', payload: { tipo: 'funciona' } });
-    return polishReply(safe || reply, { closingHint: 'offer' });
+    return polishReply(await filterDuplicateReply(userId, reply) || reply, { closingHint: 'offer' });
   }
   if (isObjectionEstraga(userMsgRaw)) {
     const reply = 'Pode ficar tranquila 💕. A fórmula é sem formol e pensada pra alinhar e dar brilho sem ressecar. Eu te passo o passo a passo seguro pra aplicar em casa. Quer?';
-    const safe = await filterDuplicateReply(userId, reply);
     logEvent({ userId, event: 'objection_tratada', payload: { tipo: 'seguranca' } });
-    return polishReply(safe || reply, { closingHint: 'offer' });
+    return polishReply(await filterDuplicateReply(userId, reply) || reply, { closingHint: 'offer' });
   }
   if (isObjectionAnvisa(userMsgRaw)) {
     const reply = 'Sim, trabalhamos com produtos liberados para comercialização no Brasil 💕. Se quiser, te envio o número de registro e orientações de uso. Quer conferir?';
-    const safe = await filterDuplicateReply(userId, reply);
     logEvent({ userId, event: 'objection_tratada', payload: { tipo: 'anvisa' } });
-    return polishReply(safe || reply, { closingHint: 'offer' });
+    return polishReply(await filterDuplicateReply(userId, reply) || reply, { closingHint: 'offer' });
   }
 
   // 3) Perguntas informativas consultivas
@@ -118,7 +91,7 @@ export async function offer({ text, context, prompts, productPrompt, price = PRI
     return polishReply(reply, { closingHint: 'offer' });
   }
   if (isAskDifferential(userMsgRaw)) {
-    const reply = 'O diferencial é o alinhamento natural, sem formol, reduzindo frizz e deixando macio e brilhante. Quer garantir pelo valor promocional?';
+    const reply = 'O diferencial é o alinhamento natural, sem formol, reduzindo frizz e deixando macio e brilhante. Quer que eu detalhe mais algum ponto?';
     logEvent({ userId, event: 'faq_respondida', payload: { tipo: 'diferencial' } });
     return polishReply(reply, { closingHint: 'offer' });
   }

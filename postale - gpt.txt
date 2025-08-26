@@ -1,10 +1,11 @@
-// src/flows/postsale.js — Etapa 8 (Pós-venda) blindada + Telemetry
+// src/flows/postsale.js — Etapa 8 (Pós-venda) blindada + Telemetry + Polimento
 import { model } from '../model.js';
 import { logEvent } from '../telemetry.js';
+import { polishReply } from '../utils/polish.js'; // ✨ polimento
 
 const COUPON_CODE = process.env.COUPON_CODE || 'TOP-AGO2025-PROGRVG-150';
 
-// Garante no máximo 1 pergunta
+// Garante no máximo 1 pergunta (failsafe adicional)
 function oneQuestionOnly(answer = '') {
   const s = String(answer || '');
   const parts = s.split('?');
@@ -54,5 +55,6 @@ export async function postSale({ text, context, prompts, productPrompt, price = 
   logEvent({ userId, event: 'pos_pagamento_enviado', payload: { preview: reply.slice(0, 120) } });
   logEvent({ userId, event: 'cupom_liberado', payload: { cupom: COUPON_CODE } });
 
-  return reply;
+  // ✨ Polimento final (máx. 2 frases, 2 emojis, 1 pergunta, pergunta de pós-venda)
+  return polishReply(reply, { closingHint: 'postsale' });
 }
