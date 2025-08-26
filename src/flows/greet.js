@@ -1,16 +1,10 @@
-// src/flows/greet.js — abertura calorosa + pedir nome (blindado)
+// src/flows/greet.js — abertura calorosa + pedir nome (blindado + polimento)
 import { model } from '../model.js';
 import { logEvent } from '../telemetry.js';
 import { setMemory } from '../memory.js';
+import { polishReply } from '../utils/polish.js'; // 🔥 novo utilitário
 
-// Garante no máximo 1 pergunta
-function oneQuestionOnly(answer = '') {
-  const s = String(answer || '');
-  const parts = s.split('?');
-  if (parts.length <= 2) return s.trim();
-  return (parts.slice(0, 2).join('?') + (s.endsWith('?') ? '?' : '')).trim();
-}
-
+// 🚀 Greet flow
 export async function greet({ text, context, prompts, productPrompt, price = 170 }) {
   const userId = (context && context.userId) || 'unknown';
 
@@ -38,11 +32,12 @@ export async function greet({ text, context, prompts, productPrompt, price = 170
   ];
 
   let reply = await model.chat(messages, { maxTokens: 180, temperature: 0.7 });
-  reply = oneQuestionOnly(String(reply || '').trim());
+  reply = String(reply || '').trim();
 
   // 🚑 Fallback se vier vazio ou curto
   if (!reply || reply.length < 20) {
-    reply = "Oi! Seja muito bem-vinda 💕 Eu sou a Carla da TopOfertas Express, uso essa progressiva e amo o resultado. Qual é o seu nome? 💇‍♀️";
+    reply =
+      "Oi! Seja muito bem-vinda 💕 Eu sou a Carla da TopOfertas Express, uso essa progressiva e amo o resultado. Qual é o seu nome? 💇‍♀️";
   }
 
   // 🔐 Marca que já pediu o nome (pra personalizar nas próximas etapas)
@@ -55,5 +50,6 @@ export async function greet({ text, context, prompts, productPrompt, price = 170
     payload: { preview: reply.slice(0, 120) }
   });
 
-  return reply;
+  // ✨ Polimento final (máx 2 frases, 2 emojis, só 1 pergunta, pergunta certa)
+  return polishReply(reply, { closingHint: 'need_name' });
 }

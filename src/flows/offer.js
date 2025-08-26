@@ -1,7 +1,8 @@
-// src/flows/offer.js — FSM blindada: oferta curta, persuasiva e sem link
+// src/flows/offer.js — FSM blindada + polimento final
 import { model } from '../model.js';
 import { logEvent } from '../telemetry.js';
 import { getMemory } from '../memory.js';
+import { polishReply } from '../utils/polish.js'; // ✨ novo utilitário
 
 // Configs
 const PRICE_ORIGINAL = Number(process.env.PRICE_ORIGINAL || 197);
@@ -41,12 +42,13 @@ export async function offer({ text, context, prompts, productPrompt, price = PRI
 
   // Caso seja dúvida vaga → responde com acolhimento
   if (isDuvidaVaga(text)) {
-    const resposta =
+    let resposta =
       `${nome ? nome + ', ' : ''}eu entendo sua dúvida 💕 Pode ficar tranquila: ` +
       `o tratamento é seguro, sem formol, e você só paga quando receber (${codLinha}). ` +
       `Hoje ele está ${precoLinha}. Quer que eu te mostre depoimentos reais de clientes?`;
+
     logEvent({ userId, event: 'objection_tratada', payload: { tipo: 'nao_confio', preview: resposta.slice(0, 120) } });
-    return resposta;
+    return polishReply(resposta, { closingHint: 'offer' });
   }
 
   const sys =
@@ -96,5 +98,6 @@ export async function offer({ text, context, prompts, productPrompt, price = PRI
     }
   });
 
-  return reply;
+  // ✨ Polimento final (máx 2 frases, 2 emojis, 1 pergunta, pergunta de oferta)
+  return polishReply(reply, { closingHint: 'offer' });
 }

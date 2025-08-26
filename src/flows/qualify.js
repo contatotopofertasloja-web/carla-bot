@@ -1,25 +1,26 @@
-// src/flows/qualify.js — versão FSM blindada
+// src/flows/qualify.js — versão FSM blindada + polimento final
 import { model } from '../model.js';
 import { logEvent } from '../telemetry.js';
 import { getMemory, setMemory } from '../memory.js';
+import { polishReply } from '../utils/polish.js'; // ✨ novo utilitário de polimento
 
 // detecta tipo de cabelo
 function detectHairType(text = '') {
-  const t = text.toLowerCase();
-  if (/liso/.test(t)) return "liso";
-  if (/ondulad/.test(t)) return "ondulado";
-  if (/cachead|caracolad/.test(t)) return "cacheado";
-  if (/cresp/.test(t)) return "crespo";
+  const t = (text || '').toLowerCase();
+  if (/liso/.test(t)) return 'liso';
+  if (/ondulad/.test(t)) return 'ondulado';
+  if (/cachead|caracolad/.test(t)) return 'cacheado';
+  if (/cresp/.test(t)) return 'crespo';
   return null;
 }
 
 // detecta menção a dor
 function detectDor(text = '') {
-  const t = text.toLowerCase();
+  const t = (text || '').toLowerCase();
   return /(frizz|arma|chapinha|escova|definiç|ressecad|quebra|tempo|umidade|indefinid)/i.test(t);
 }
 
-// garante só 1 pergunta
+// garante só 1 pergunta (failsafe adicional)
 function oneQuestionOnly(answer = '') {
   const s = String(answer || '');
   const parts = s.split('?');
@@ -66,9 +67,9 @@ export async function qualify({ text, context, prompts, productPrompt }) {
   // 🚑 Fallback se vier vazio ou ruim
   if (!reply || reply.length < 10) {
     if (!hairType) {
-      reply = "Só pra entender melhor 💕 Seu cabelo é liso, ondulado, cacheado ou crespo?";
+      reply = 'Só pra entender melhor 💕 Seu cabelo é liso, ondulado, cacheado ou crespo?';
     } else {
-      reply = "Entendi 💕 E qual a maior dificuldade dele hoje: frizz, volume ou alinhamento?";
+      reply = 'Entendi 💕 E qual a maior dificuldade dele hoje: frizz, volume ou alinhamento?';
     }
   }
 
@@ -87,5 +88,7 @@ export async function qualify({ text, context, prompts, productPrompt }) {
     });
   }
 
-  return reply;
+  // ✨ Polimento final (2 frases, 2 emojis, 1 pergunta, pergunta certa)
+  const hint = hairType ? 'pain' : 'hair_type';
+  return polishReply(reply, { closingHint: hint });
 }
