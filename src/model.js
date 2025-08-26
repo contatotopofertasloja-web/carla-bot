@@ -5,18 +5,28 @@ import OpenAI from 'openai';
 const apiKey = (process.env.OPENAI_API_KEY || '').trim();
 export const openai = new OpenAI({ apiKey });
 
-// --- Resolver nome do modelo (com anti-mini) ---
+// --- Resolve o nome do modelo (SEM anti-mini) ---
 function resolveModelName() {
+  // Prioridade de variáveis (a primeira definida vence)
   const raw =
     (process.env.MODEL_NAME ||
-     process.env.OPENAI_MODEL ||
-     process.env.CHAT_MODEL ||
-     '').trim();
+      process.env.OPENAI_MODEL ||
+      process.env.CHAT_MODEL ||
+      '').trim();
 
-  // Se vier vazio ou explicitamente mini, força gpt-4o
-  if (!raw || raw === 'gpt-4o-mini') return 'gpt-4o';
+  // Padrão seguro se nada vier
+  if (!raw) return 'gpt-4o-mini';
 
-  return raw;
+  // Normalização básica de aliases
+  const name = raw.toLowerCase();
+  const aliases = {
+    mini: 'gpt-4o-mini',
+    'gpt4o-mini': 'gpt-4o-mini',
+    'gpt4o': 'gpt-4o',
+    'gpt-4': 'gpt-4o',
+  };
+
+  return aliases[name] || name;
 }
 
 export const EFFECTIVE_MODEL = resolveModelName();
@@ -40,7 +50,6 @@ export const model = {
         },
         { signal: controller.signal }
       );
-
       return resp.choices?.[0]?.message?.content?.trim() || '';
     } finally {
       clearTimeout(id);
