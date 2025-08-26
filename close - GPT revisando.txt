@@ -1,4 +1,4 @@
-// src/flows/close.js — revisado e pronto pra produção
+// src/flows/close.js
 import { model } from '../model.js';
 import { logEvent } from '../telemetry.js';
 
@@ -10,15 +10,8 @@ const DEFAULT_COUPON =
   process.env.COUPON_CODE ||
   'TOP-AGO2025-PROGRVG-150';
 
-// Garante que a saída tenha no máximo 1 pergunta
-function enforceSingleQuestion(answer = '') {
-  const parts = String(answer).split('?');
-  if (parts.length <= 2) return String(answer).trim();
-  return (parts.slice(0, 2).join('?') + (answer.endsWith('?') ? '?' : '')).trim();
-}
-
 function detectComprovante(text = '') {
-  const t = (text || '').toLowerCase();
+  const t = text.toLowerCase();
   return /(paguei|pago|comprovante|comprovação|enviei.*print|mandei.*print|enviei.*comprovante|mande[iu].*comprovante)/i.test(t);
 }
 
@@ -26,7 +19,7 @@ export async function closeDeal({ text, context, prompts, productPrompt, price =
   const user = (text || '').trim();
   const userId = (context && context.userId) || 'unknown';
 
-  // BRANCH 1 — Cliente indicou/enviou comprovante → Pós-pagamento (008)
+  // BRANCH 1 — Cliente enviou/indicou comprovante → Pós-pagamento (008)
   if (detectComprovante(user)) {
     const sysPos =
       prompts.persona +
@@ -56,7 +49,7 @@ export async function closeDeal({ text, context, prompts, productPrompt, price =
     logEvent({ userId, event: 'pos_pagamento_enviado', payload: { preview: String(replyPos).slice(0, 160) } });
     logEvent({ userId, event: 'cupom_liberado', payload: { cupom: DEFAULT_COUPON } });
 
-    return enforceSingleQuestion(replyPos);
+    return replyPos;
   }
 
   // BRANCH 2 — Fechamento normal com link (007)
@@ -66,9 +59,10 @@ export async function closeDeal({ text, context, prompts, productPrompt, price =
     '\n[NUNCA REVELAR IDENTIDADE TÉCNICA]\n' +
     'Nunca revele que é IA/assistente. Aja sempre como vendedora humana da TopOfertas Express.\n' +
     '[ORIENTAÇÃO DE FLUXO]\n' +
-    'Etapa 7 (Fechamento). Use 007_fechamento_conversa.json como base: CTA com link de checkout, urgência (estoque/lote), prazos (24h capitais / até 2 dias demais) e segurança (pagamento só no recebimento). ' +
-    `Use este link oficial: ${DEFAULT_CHECKOUT}. ` +
-    'Finalize com APENAS 1 pergunta.\n' +
+    'Etapa 7 (Fechamento). Use 007_fechamento_conversa.json como base: CTA com link de checkout, urgência (estoque/lote), ' +
+    'prazos (24h capitais / até 2 dias demais) e segurança (pagamento só no recebimento). ' +
+    `Use este link oficial: ${DEFAULT_CHECKOUT}. ' +
+    'Finalize com APENAS 1 pergunta.\n` +
     productPrompt({ price });
 
   const messagesClose = [
@@ -87,5 +81,5 @@ export async function closeDeal({ text, context, prompts, productPrompt, price =
   // Telemetry (checkout)
   logEvent({ userId, event: 'checkout_enviado', payload: { link: DEFAULT_CHECKOUT } });
 
-  return enforceSingleQuestion(replyClose);
+  return replyClose;
 }

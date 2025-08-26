@@ -1,0 +1,50 @@
+{
+  "name": "OBJECOES",
+  "version": "1.0.0",
+  "description": "Bloco de respostas para objeções comuns sobre a Progressiva Vegetal Premium.",
+  "instructions": "Quando a cliente apresentar uma objeção, identifique o tipo correspondente e selecione 1–2 respostas do grupo. Reescreva sempre no estilo natural e empático da Carla, variando as expressões para não parecer repetitivo.",
+  "data": {
+    "caro": [
+      "Entendo totalmente! Mas pense que o tratamento dura até 3 meses, sai menos de R$2 por dia para manter o cabelo alinhado.",
+      "Muita gente pensa no valor imediato, mas quando compara com salão, percebe que economiza bastante.",
+      "Se colocar na ponta do lápis, você gasta mais em chapinha, produtos e tempo do que investindo nesse tratamento.",
+      "E o melhor: você só paga quando receber, no pagamento na entrega, sem risco pra você.",
+      "A vantagem é que você resolve de uma vez e não precisa se preocupar nos próximos meses."
+    ],
+    "medo_estragar": [
+      "Essa preocupação é super válida! Mas a Progressiva Vegetal é sem formol, totalmente segura para os fios.",
+      "Diferente das químicas fortes, ela hidrata enquanto alinha, então o cabelo sai mais macio e saudável.",
+      "O objetivo dela não é agredir, mas tratar e alinhar ao mesmo tempo.",
+      "Muitas clientes que tiveram experiências ruins com outras progressivas se surpreendem com a leveza dessa.",
+      "Pode ficar tranquila: não tem cheiro forte, não arde e não resseca o cabelo."
+    ],
+    "nao_funcionou": [
+      "Eu entendo sua frustração! A diferença dessa é que ela tem efeito real já na primeira aplicação.",
+      "Outras progressivas usam química agressiva que só mascara o fio. Essa atua de forma natural e duradoura.",
+      "Temos clientes que já tentaram várias e só aqui encontraram resultado de verdade.",
+      "O efeito é comprovado e dura até 3 meses sem precisar de retoque constante.",
+      "Você só precisa aplicar uma vez e já percebe o cabelo alinhado e sem frizz."
+    ],
+    "tem_formol": [
+      "Pode ficar tranquila: é 100% sem formol.",
+      "Esse é justamente o diferencial: resultado profissional sem química agressiva.",
+      "Não causa ardência, não tem cheiro forte e é seguro até para couro cabeludo sensível.",
+      "Além de alinhar, hidrata e fortalece os fios.",
+      "É por isso que chamamos de Premium: liso, natural e saudável."
+    ],
+    "sem_tempo": [
+      "A aplicação é super prática e rápida, sem precisar de salão.",
+      "Depois de aplicar, você economiza horas toda semana sem precisar de chapinha.",
+      "É só aplicar e pronto: você esquece a luta com o frizz por até 3 meses.",
+      "O tempo que você investe uma vez compensa muito na rotina depois.",
+      "Imagine acordar já com o cabelo alinhado, sem perder tempo arrumando."
+    ],
+    "nao_confio": [
+      "É normal ter essa dúvida, mas aqui você tem o pagamento na entrega: só paga quando receber.",
+      "Você não precisa colocar cartão ou pagar antes, só recebe e aí sim paga.",
+      "Isso garante que você não corre nenhum risco.",
+      "Muita gente compra pela primeira vez assim e depois repete porque se sente segura.",
+      "Além disso, você recebe o produto original, lacrado e com garantia."
+    ]
+  }
+}
