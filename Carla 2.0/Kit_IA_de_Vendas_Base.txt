@@ -1,0 +1,217 @@
+Kit IA de Vendas (GPT + Funil + Ferramentas)
+
+Este documento serve como base referencial para configuração, manutenção
+e evolução da IA de vendas que utiliza GPT para atender leads e fechar
+pedidos. Todo o conteúdo foi revisado para evitar inconsistências.
+
+------------------------------------------------------------------------
+
+1) /src/prompts/base.js
+
+    // src/prompts/base.js
+
+    export const persona = `
+    Você é a Lívia, vendedora consultiva, objetiva e carismática. Seu objetivo #1 é converter leads.
+    - Tom: amigável, profissional, direto.
+    - Tamanho: 2–4 linhas por mensagem.
+    - Emojis: só quando ajudarem (máx. 1 por mensagem).
+    - Uma pergunta por vez. Não faça interrogatório.
+    - Nunca reinicie a conversa sem necessidade.
+    `;
+
+    export const styleRules = `
+    REGRAS DE ESTILO:
+    1) Responda o que foi perguntado primeiro; em seguida avance o funil.
+    2) Uma pergunta por turno; se precisar de duas, conecte: "Qual seu CEP? Aí já te passo o frete certinho."
+    3) Não invente preço/prazo/estoque; use ferramentas designadas.
+    4) Quando houver intenção clara de compra, ofereça o link de checkout.
+    5) Evite parágrafos longos; frases curtas, CTA claros.
+    `;
+
+    export const businessRules = ({ priceTarget = 170, hasCOD = true }) => `
+    REGRAS DE NEGÓCIO:
+    - Ticket alvo: R$ ${priceTarget} (ajustável).
+    - Pagamentos: Pix (5% off se disponível), Cartão (até 3x), Boleto (quando aplicável).
+    - Pagamento na Entrega (COD): ${hasCOD ? 'DISPONÍVEL' : 'INDISPONÍVEL'}; usar quando houver objeção de confiança.
+    - Link de checkout só quando solicitado ou quando lead sinalizar compra.
+    `;
+
+    export const stageObjectives = {
+      greet: `Dê boas-vindas curtas e puxe 1 informação útil para qualificar.`,
+      qualify: `Descobrir objetivo do cliente e preferência de pagamento; pronto para apresentar oferta.`,
+      present_offer: `Mostrar benefício/condição com clareza e CTA para fechar.`,
+      objection: `Identificar objeção (preço, prazo, confiança) e contornar.`,
+      close: `Gerar/entregar link e acompanhar até o pagamento.`,
+      post_sale: `Agradecer, reforçar próximos passos e suporte.`,
+    };
+
+    export function buildSystemPrompt({ stage, priceTarget, hasCOD }) {
+      const goal = stageObjectives[stage] || 'Conduza a venda com objetividade.';
+      return [
+        persona,
+        styleRules,
+        businessRules({ priceTarget, hasCOD }),
+        `FOCO DO TURNO (stage: ${stage}): ${goal}`,
+        `USE FERRAMENTAS para: preço, prazo, estoque, checkout. Não chute valores.`
+      ].join('\n\n');
+    }
+
+------------------------------------------------------------------------
+
+2) /src/fsm.js
+
+    // src/fsm.js
+
+    export const STAGES = [
+      'greet',
+      'qualify',
+      'present_offer',
+      'objection',
+      'close',
+      'post_sale',
+    ];
+
+    export function nextStage({ stage, signals }) {
+      const s = stage || 'greet';
+      const sig = signals || {};
+      if (s === 'greet') return 'qualify';
+      if (s === 'qualify' && (sig.readyToSeeOffer || sig.readyToBuy)) return 'present_offer';
+      if (s === 'present_offer' && sig.hasObjection) return 'objection';
+      if (s === 'present_offer' && sig.readyToBuy) return 'close';
+      if (s === 'objection' && sig.resolved) return 'close';
+      if (s === 'close' && sig.paymentDone) return 'post_sale';
+      return s;
+    }
+
+    export const intentSchema = `
+    Devolva JSON com:
+    {"intent":"price|delivery|payment|features|greeting|other|objection|close",
+     "readyToBuy":bool,
+     "hasObjection":bool,
+     "readyToSeeOffer":bool,
+     "wantsCOD":bool}
+    `;
+
+------------------------------------------------------------------------
+
+3) /src/tools.js
+
+    // src/tools.js
+
+    export async function getPrice({ sku }) {
+      return { sku, price: 17000, currency: 'BRL', promoPct: 5 };
+    }
+
+    export async function getDeliveryETA({ cep, sku, qty = 1 }) {
+      return { cep, daysMin: 3, daysMax: 5, shippingPrice: 2490 };
+    }
+
+    export async function checkStock({ sku }) {
+      return { sku, available: true, qty: 42 };
+    }
+
+    export async function createCheckout({ sku, payment, cep, utm }) {
+      const id = Math.random().toString(36).slice(2);
+      const url = `https://sualoja.com/checkout/${id}?sku=${sku}&payment=${payment}&cep=${cep}&utm=${encodeURIComponent(utm||'ia-bot')}`;
+      return { id, url };
+    }
+
+    export async function applyCoupon({ code, sku }) {
+      const valid = code?.toUpperCase() === 'BEMVINDO5';
+      return { code, valid, discountPct: valid ? 5 : 0 };
+    }
+
+    export async function saveLead({ name, phone, intent, source }) {
+      return { ok: true, id: Math.random().toString(36).slice(2), name, phone, intent, source };
+    }
+
+    export async function logTelemetry(event) {
+      console.log('[telemetry]', JSON.stringify(event));
+      return { ok: true };
+    }
+
+------------------------------------------------------------------------
+
+4) /src/handlers/handleMsg.js
+
+    // src/handlers/handleMsg.js
+    import { buildSystemPrompt } from '../prompts/base.js';
+    import { STAGES, nextStage, intentSchema } from '../fsm.js';
+    import { chat } from '../model.js';
+    import { getPrice, getDeliveryETA, createCheckout, checkStock, applyCoupon, saveLead, logTelemetry } from '../tools.js';
+
+    const DEFAULTS = { priceTarget: 170, hasCOD: true };
+
+    export async function handleMsg(ctx) {
+      const startedAt = Date.now();
+
+      const classify = await chat([
+        { role: 'system', content: intentSchema },
+        { role: 'user', content: ctx.text || '' },
+      ], { responseFormat: 'json' });
+
+      ctx.signals = classify;
+      ctx.stage = nextStage({ stage: ctx.stage, signals: ctx.signals });
+
+      if (!ctx.leadSaved && ctx.user?.phone) {
+        await saveLead({ name: ctx.user?.name || 'Lead', phone: ctx.user.phone, intent: classify.intent, source: ctx.meta?.source || 'whatsapp' });
+        ctx.leadSaved = true;
+      }
+
+      const system = buildSystemPrompt({ stage: ctx.stage, ...DEFAULTS });
+
+      const tools = { getPrice, getDeliveryETA, createCheckout, checkStock, applyCoupon };
+
+      const assistant = await chat([
+        { role: 'system', content: system },
+        { role: 'user', content: ctx.text || '' },
+        { role: 'system', content: 'Use as funções para preço, prazo, estoque e checkout quando necessário.' },
+      ], { tools });
+
+      const finishedAt = Date.now();
+      await logTelemetry({
+        t: new Date().toISOString(),
+        stage: ctx.stage,
+        intent: classify.intent,
+        signals: ctx.signals,
+        msgIn: ctx.text,
+        msgOut: assistant?.message,
+        ms: finishedAt - startedAt,
+        source: ctx.meta?.source || 'whatsapp',
+      });
+
+      return { message: assistant?.message, stage: ctx.stage };
+    }
+
+------------------------------------------------------------------------
+
+5) /src/telemetry/schema.sql
+
+    CREATE TABLE IF NOT EXISTS sales_bot_events (
+      id SERIAL PRIMARY KEY,
+      t TIMESTAMP WITH TIME ZONE NOT NULL,
+      stage TEXT,
+      intent TEXT,
+      signals JSONB,
+      msg_in TEXT,
+      msg_out TEXT,
+      ms INT,
+      source TEXT,
+      link_clicked BOOLEAN DEFAULT NULL,
+      checkout_started BOOLEAN DEFAULT NULL,
+      paid BOOLEAN DEFAULT NULL,
+      loss_reason TEXT CHECK (loss_reason IN ('preco','prazo','confianca','indecisao','sumiu','sem_estoque'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_sales_bot_events_t ON sales_bot_events(t);
+    CREATE INDEX IF NOT EXISTS idx_sales_bot_events_stage ON sales_bot_events(stage);
+    CREATE INDEX IF NOT EXISTS idx_sales_bot_events_intent ON sales_bot_events(intent);
+
+------------------------------------------------------------------------
+
+6) .env de exemplo
+
+    PRICE_TARGET=170
+    HAS_COD=true
+    OPENAI_API_KEY=***
+    DB_URL=postgres://user:pass@host:5432/db

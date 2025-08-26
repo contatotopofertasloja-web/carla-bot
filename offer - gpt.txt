@@ -1,11 +1,15 @@
-// src/flows/offer.js — revisado: 2 frases + 1 pergunta, sem link, objeções vagas tratadas
+// src/flows/close.js — refinado: polimento + anti-duplicata + objeções + ofensa
 import { model } from '../model.js';
 import { logEvent } from '../telemetry.js';
 import { getMemory, setMemory } from '../memory.js';
+import { polishReply } from '../utils/polish.js';
 
-// Configs
-const PRICE_ORIGINAL = Number(process.env.PRICE_ORIGINAL || 197);
-const PRICE_PROMO    = Number(process.env.PRICE_TARGET   || 170);
+const CHECKOUT_LINK =
+  process.env.CHECKOUT_LINK ||
+  'https://entrega.logzz.com.br/pay/memmpxgmg/progcreme170';
+
+const COUPON_CODE = process.env.COUPON_CODE || 'TOP-AGO2025-PROGRVG-150';
+const ANTI_DUP_TTL_MS = 2 * 60 * 1000; // 2 minutos
 
 function oneQuestionOnly(answer = '') {
   const s = String(answer || '');
@@ -14,85 +18,190 @@ function oneQuestionOnly(answer = '') {
   return (parts.slice(0, 2).join('?') + (s.endsWith('?') ? '?' : '')).trim();
 }
 
-function benefitByHairType(hairType) {
-  const t = (hairType || '').toLowerCase();
-  if (t.includes('liso'))      return 'liso alinhado sem chapinha diária';
-  if (t.includes('ondulado'))  return 'ondas definidas e menos frizz';
-  if (t.includes('cacheado'))  return 'cachos definidos e redução de volume';
-  if (t.includes('crespo'))    return 'volume reduzido com fios hidratados';
-  return 'cabelo alinhado, macio e com brilho de salão';
+// -- Detectores auxiliares ----------------------------------------------------
+function detectComprovante(text = '') {
+  return /(paguei|pago|comprovante|print|enviei.*comprovante|mandei.*comprovante)/i.test(
+    (text || '').toLowerCase()
+  );
 }
 
-// Detecta se o texto é uma dúvida vaga/insegurança → tratamos como objeção leve
-function isDuvidaVaga(text = '') {
-  return /(não sei|nao sei|será que|sera que|tenho dúvida|tenho duvida)/i.test((text || '').toLowerCase());
+function shouldOfferLink(text = '') {
+  return /(comprar|adquirir|checkout|link|finalizar|fechar pedido|onde pago|como pago|quero pagar)/i.test(
+    (text || '').toLowerCase()
+  );
 }
 
-export async function offer({ text, context, prompts, productPrompt, price = PRICE_PROMO }) {
-  const userId   = (context && context.userId) || 'unknown';
-  const memory   = await getMemory(userId);
-  const hairType = memory?.hairType || null;
-  const nome     = memory?.name || '';
+function isFidelidade(text = '') {
+  return /(fidelidade|recompra|segunda compra|desconto futuro|cupom)/i.test(
+    (text || '').toLowerCase()
+  );
+}
 
-  const precoLinha = `de R$ ${PRICE_ORIGINAL} por R$ ${PRICE_PROMO}`;
-  const prazoLinha = 'Entrega em até 24h (capitais) ou até 2 dias (demais cidades).';
-  const codLinha   = 'Pagamento só no recebimento (COD).';
-  const urgencia   = 'Estoque promocional limitado.';
+function isObjectionFunciona(text = '') {
+  return /(será que funciona|sera que funciona|funciona mesmo|funciona\?|funcionar)/i.test(
+    (text || '').toLowerCase()
+  );
+}
 
-  // Se for dúvida vaga → responde como objeção leve (sem seguir funil)
-  if (isDuvidaVaga(text)) {
-    const resposta = `${nome ? nome + ', ' : ''}fica tranquila 💕 Você só paga quando receber (COD), sem risco nenhum. ` +
-                     `O tratamento é seguro, sem formol, e ${precoLinha}. Quer que eu te mostre mais depoimentos de clientes?`;
-    logEvent({ userId, event: 'objection_tratada', payload: { tipo: 'nao_confio', preview: resposta.slice(0, 120) } });
-    return resposta;
+function isObjectionEstraga(text = '') {
+  return /(estraga|danifica|cair.*cabelo|quebra.*cabelo|resseca)/i.test(
+    (text || '').toLowerCase()
+  );
+}
+
+function isObjectionAnvisa(text = '') {
+  return /(anvisa|é autorizado|e autorizado|registro.*anvisa|liberado pela anvisa)/i.test(
+    (text || '').toLowerCase()
+  );
+}
+
+function isOffensive(text = '') {
+  return /(vai se f|merda|porra|caralh|burra|idiot|otári|imbecil)/i.test((text || '').toLowerCase());
+}
+
+// -- Anti-duplicata (usa memory por usuário) ---------------------------------
+async function filterDuplicateReply(userId, reply) {
+  try {
+    const mem = (await getMemory(userId)) || {};
+    const now = Date.now();
+    const last = mem.lastCloseReply || { text: '', at: 0 };
+    if (reply && last.text === reply && now - (last.at || 0) < ANTI_DUP_TTL_MS) {
+      // troca por uma variante curtinha para não repetir a mesma
+      return null; // indica para gerar fallback variante
+    }
+    await setMemory(userId, { ...mem, lastCloseReply: { text: reply, at: now } });
+  } catch {}
+  return reply;
+}
+
+// -- Flow principal -----------------------------------------------------------
+export async function closeDeal({ text, context, prompts, productPrompt, price = 170 }) {
+  const user = (text || '').trim();
+  const userId = (context && context.userId) || 'unknown';
+
+  // 0) Linguagem ofensiva → encerra educadamente (sem venda)
+  if (isOffensive(user)) {
+    const reply =
+      'Entendo que você possa estar chateada 💕. Se preferir, podemos encerrar por aqui. ' +
+      'Se quiser falar sobre o produto em outro momento, estarei aqui pra te ajudar. Tudo bem?';
+    logEvent({ userId, event: 'ofensa_detectada', payload: { preview: reply.slice(0, 120) } });
+    return polishReply(reply, { closingHint: 'close' });
   }
 
+  // 1) Pós-venda (comprovante)
+  if (detectComprovante(user)) {
+    const sys =
+      prompts.persona +
+      prompts.styleRules +
+      '\n[NUNCA REVELAR IDENTIDADE TÉCNICA]\n' +
+      'Você é vendedora humana da TopOfertas Express.\n' +
+      '[ETAPA 8 — PÓS-VENDA]\n' +
+      `Confirme print + agradeça + libere CUPOM fidelidade R$150: ${COUPON_CODE}.` +
+      '\nFinalize com 1 pergunta leve.\n' +
+      productPrompt({ price });
+
+    const messages = [
+      { role: 'system', content: sys },
+      { role: 'user', content: `Mensagem: "${user}"` }
+    ];
+    let reply = await model.chat(messages, { maxTokens: 160, temperature: 0.55 });
+    reply = oneQuestionOnly(reply);
+
+    if (!reply || reply.length < 20) {
+      reply =
+        `Comprovante recebido ✅ Muito obrigada 💕 Seu pedido foi registrado. ` +
+        `Aqui está seu cupom fidelidade: ${COUPON_CODE} (válido 3 meses). ` +
+        `Quer que eu te avise quando sair para entrega?`;
+    }
+
+    logEvent({ userId, event: 'pos_pagamento_enviado', payload: { preview: reply.slice(0, 120) } });
+    logEvent({ userId, event: 'cupom_liberado', payload: { cupom: COUPON_CODE } });
+
+    const safe = await filterDuplicateReply(userId, reply);
+    return polishReply(safe || 'Obrigada 💕 Seu pedido está confirmado. Quer que eu te avise quando sair para entrega?', {
+      closingHint: 'postsale'
+    });
+  }
+
+  // 2) Fidelidade / recompra — sem link
+  if (isFidelidade(user)) {
+    const reply = `Na sua recompra você ganha um cupom de R$150 💕 (código: ${COUPON_CODE}), válido por 3 meses.`;
+    const safe = await filterDuplicateReply(userId, reply);
+    return polishReply(safe || 'Na recompra, você tem um cupom de R$150 válido por 3 meses. Posso te avisar quando tivermos promoções?', {
+      closingHint: 'close'
+    });
+  }
+
+  // 3) Objeções (empatia + prova social), sem link
+  if (isObjectionFunciona(user)) {
+    const reply =
+      'Eu entendo a sua dúvida 💕. Ele funciona sim: reduz o frizz e deixa o cabelo alinhado, com acabamento natural. ' +
+      'Tenho vários feedbacks positivos de clientes que amaram o resultado. Quer que eu te conte como aplicar certinho?';
+    const safe = await filterDuplicateReply(userId, reply);
+    logEvent({ userId, event: 'objection_tratada', payload: { tipo: 'funciona' } });
+    return polishReply(safe || reply, { closingHint: 'close' });
+  }
+
+  if (isObjectionEstraga(user)) {
+    const reply =
+      'Pode ficar tranquila 💕. A fórmula é sem formol e não resseca: o objetivo é alinhar e dar brilho mantendo o cabelo saudável. ' +
+      'Se preferir, te passo o passo a passo para aplicar com segurança em casa. Quer?';
+    const safe = await filterDuplicateReply(userId, reply);
+    logEvent({ userId, event: 'objection_tratada', payload: { tipo: 'seguranca' } });
+    return polishReply(safe || reply, { closingHint: 'close' });
+  }
+
+  if (isObjectionAnvisa(user)) {
+    const reply =
+      'Sim, trabalhamos com produtos liberados para comercialização no Brasil 💕. ' +
+      'Se quiser, te envio o número de registro e as orientações de uso recomendadas. Quer conferir?';
+    const safe = await filterDuplicateReply(userId, reply);
+    logEvent({ userId, event: 'objection_tratada', payload: { tipo: 'anvisa' } });
+    return polishReply(safe || reply, { closingHint: 'close' });
+  }
+
+  // 4) Fechamento informativo sem intenção de compra — sem link
+  if (!shouldOfferLink(user)) {
+    const reply =
+      'Pode ficar tranquila 💕 O pagamento é só na entrega (COD) e a entrega leva até 24h em capitais ou 2 dias em outras cidades.';
+    const safe = await filterDuplicateReply(userId, reply);
+    return polishReply(safe || reply, { closingHint: 'close' });
+  }
+
+  // 5) Fechamento com intenção clara — COM link
   const sys =
     prompts.persona +
     prompts.styleRules +
     '\n[NUNCA REVELAR IDENTIDADE TÉCNICA]\n' +
     'Você é vendedora humana da TopOfertas Express.\n' +
-    '[ETAPA 6 — OFERTA]\n' +
-    '- Responder em no máximo 2 frases + 1 pergunta.\n' +
-    `- Sempre incluir: ${precoLinha}, ${codLinha}, ${prazoLinha}, ${urgencia}.\n` +
-    '- Personalizar se souber tipo de cabelo.\n' +
-    '- Não enviar link nesta etapa.\n' +
+    '[ETAPA 7 — FECHAMENTO]\n' +
+    `Use o link oficial: ${CHECKOUT_LINK}\n` +
+    'Mensagem curta: preço promocional, urgência, prazo e COD.\n' +
+    'Máx. 2 frases + 1 pergunta.\n' +
     productPrompt({ price });
-
-  const userMsg =
-    (nome ? `Cliente: ${nome}\n` : '') +
-    (hairType ? `Tipo de cabelo: ${hairType}\n` : '') +
-    `Mensagem: "${(text || '').trim()}"\n` +
-    'Monte a OFERTA com 2 frases + 1 pergunta, sem link.';
 
   const messages = [
     { role: 'system', content: sys },
-    { role: 'user', content: userMsg }
+    {
+      role: 'user',
+      content: `Mensagem: "${user}"\nMonte o FECHAMENTO com 2 frases + 1 pergunta. Inclua link ${CHECKOUT_LINK}.`
+    }
   ];
 
-  let reply = await model.chat(messages, { maxTokens: 180, temperature: 0.55 });
-  reply = String(reply || '').trim();
-
-  // Fallback se vier ruim ou contiver link
-  if (!reply || reply.length < 20 || reply.split('.').length > 3 || /https?:\/\//i.test(reply)) {
-    reply =
-      `${nome ? nome + ', ' : ''}olha só: ${precoLinha}, ` +
-      `com ${benefitByHairType(hairType)}. ${codLinha} ${prazoLinha} ${urgencia} ` +
-      'Quer garantir pelo preço promocional?';
-  }
-
+  let reply = await model.chat(messages, { maxTokens: 160, temperature: 0.55 });
   reply = oneQuestionOnly(reply);
 
-  logEvent({
-    userId,
-    event: 'oferta_mostrada',
-    payload: {
-      hairType,
-      preview: reply.slice(0, 160),
-      price_original: PRICE_ORIGINAL,
-      price_promo: PRICE_PROMO
-    }
-  });
+  if (!reply || reply.length < 20 || !reply.includes('http')) {
+    reply =
+      `Aproveite: de R$197 por R$${price}, com entrega rápida e pagamento só na entrega (COD). ` +
+      `Link oficial: ${CHECKOUT_LINK} Quer garantir já pelo valor promocional?`;
+  }
 
-  return reply;
+  logEvent({ userId, event: 'checkout_enviado', payload: { link: CHECKOUT_LINK } });
+
+  const safe = await filterDuplicateReply(userId, reply);
+  return polishReply(
+    safe || `Aqui está o link oficial: ${CHECKOUT_LINK} Posso confirmar seu pedido pelo valor promocional?`,
+    { closingHint: 'close' }
+  );
 }

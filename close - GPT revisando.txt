@@ -1,6 +1,7 @@
-// src/flows/close.js — revisado: só manda link em intenção de compra + fidelidade sem link
+// src/flows/close.js — revisado + polimento final
 import { model } from '../model.js';
 import { logEvent } from '../telemetry.js';
+import { polishReply } from '../utils/polish.js'; // ✨ polimento
 
 const CHECKOUT_LINK =
   process.env.CHECKOUT_LINK ||
@@ -16,13 +17,16 @@ function oneQuestionOnly(answer = '') {
   if (parts.length <= 2) return s.trim();
   return (parts.slice(0, 2).join('?') + (s.endsWith('?') ? '?' : '')).trim();
 }
+
 function detectComprovante(text = '') {
   return /(paguei|pago|comprovante|print|enviei.*comprovante|mandei.*comprovante)/i.test((text||'').toLowerCase());
 }
+
 // 👇 Intenção de compra (só nesses casos pode mandar link)
 function shouldOfferLink(text = '') {
   return /(comprar|adquirir|checkout|link|finalizar|fechar pedido|onde pago)/i.test((text||'').toLowerCase());
 }
+
 // 👇 Perguntas de fidelidade
 function isFidelidade(text = '') {
   return /(fidelidade|recompra|segunda compra|desconto futuro|cupom)/i.test((text||'').toLowerCase());
@@ -59,20 +63,22 @@ export async function closeDeal({ text, context, prompts, productPrompt, price =
     logEvent({ userId, event: 'pos_pagamento_enviado', payload: { preview: reply.slice(0, 120) } });
     logEvent({ userId, event: 'cupom_liberado', payload: { cupom: COUPON_CODE } });
 
-    return reply;
+    return polishReply(reply, { closingHint: 'postsale' });
   }
 
   // Fidelidade / recompra — não empurra link
   if (isFidelidade(user)) {
-    return `Na sua recompra você ganha um cupom de R$150 💕 (código: ${COUPON_CODE}), válido por 3 meses.`;
+    const reply = `Na sua recompra você ganha um cupom de R$150 💕 (código: ${COUPON_CODE}), válido por 3 meses.`;
+    return polishReply(reply, { closingHint: 'close' });
   }
 
-  // Fechamento normal
+  // Fechamento normal — perguntas informativas sem link
   if (!shouldOfferLink(user)) {
-    // Pergunta informativa → responde sem link
-    return "Pode ficar tranquila 💕 O pagamento é só na entrega (COD) e a entrega leva até 24h em capitais ou 2 dias em outras cidades.";
+    const reply = "Pode ficar tranquila 💕 O pagamento é só na entrega (COD) e a entrega leva até 24h em capitais ou 2 dias em outras cidades.";
+    return polishReply(reply, { closingHint: 'close' });
   }
 
+  // Fechamento com intenção de compra — envia link
   const sys =
     prompts.persona + prompts.styleRules +
     '\n[NUNCA REVELAR IDENTIDADE TÉCNICA]\n' +
@@ -97,5 +103,5 @@ export async function closeDeal({ text, context, prompts, productPrompt, price =
   }
 
   logEvent({ userId, event: 'checkout_enviado', payload: { link: CHECKOUT_LINK } });
-  return reply;
+  return polishReply(reply, { closingHint: 'close' });
 }

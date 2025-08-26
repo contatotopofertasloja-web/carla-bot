@@ -1,0 +1,83 @@
+KIT IA DE VENDAS 2.0 — ARQUITETURA ESCALÁVEL (Cláudia 2.0)
+
+Objetivo:
+Criar uma arquitetura de assistente de vendas no WhatsApp que seja modular, escalável e reutilizável para diferentes produtos e personas.
+
+
+1. Estrutura de Intenções (Intents)
+----------------------------------
+- Cada mensagem recebida do cliente é classificada em uma intenção clara.
+- Exemplos de intents:
+  - greet (saudação)
+  - qualify (descoberta: tipo de cabelo, dor, objetivo)
+  - offer (oferta padrão)
+  - objection.price (objeção sobre preço)
+  - objection.quality (objeção sobre qualidade)
+  - objection.security (objeção sobre segurança/ANVISA)
+  - faq.delivery (prazo de entrega)
+  - faq.payment (formas de pagamento)
+  - faq.how_to_use (modo de uso)
+  - close (intenção de compra)
+  - post_sale (pós-venda: comprovante, cupom)
+
+- Benefício: facilita a manutenção e o reuso da arquitetura em qualquer produto.
+
+
+2. Ferramentas Auxiliares (Tools)
+---------------------------------
+- Funções independentes que fornecem dados confiáveis para o bot.
+- Exemplos de tools:
+  - getPrice(productId)
+  - getDiscount(productId, qty)
+  - getDeliveryTime(zipcode)
+  - getPaymentOptions(productId)
+  - getCheckoutLink(productId)
+  - getFaqAnswer(topic)
+
+- Benefício: o modelo não inventa dados, apenas consulta as funções certas.
+
+
+3. Telemetria Estruturada
+-------------------------
+- Cada interação gera um evento em formato JSON com:
+  - userId
+  - intent detectada
+  - resposta enviada
+  - etapa do funil (stage)
+  - status (conversão, perda, dúvida)
+- Eventos são armazenados em banco ou planilha para análise posterior.
+- Permite comparar desempenho entre produtos e bots (ex.: Carla x Lívia x Cláudia).
+
+
+4. Prompt Base Enxuto
+---------------------
+- Persona (tom humano, empático, persuasivo).
+- StyleRules (máx. 2 frases + 1 pergunta, emojis limitados).
+- BusinessRules (link só no close, reforçar COD, tratar objeções com empatia).
+- Objetivo da etapa (definido pela intenção).
+- Histórico curto (últimas 2-3 interações).
+
+- Benefício: menos confusão para o modelo, respostas mais consistentes.
+
+
+5. Escalabilidade
+-----------------
+- Para criar uma nova persona (ex.: "Melissa"):
+  - Duplicar configuração.
+  - Ajustar persona (voz, estilo).
+  - Conectar tools ao produto certo.
+  - Reaproveitar 90% da arquitetura.
+
+- Para trocar de produto:
+  - Apenas mudar dados nas tools (preço, link, diferenciais).
+  - Nenhum ajuste no core do bot.
+
+- Resultado: múltiplas "meninas de vendas" operando com base única.
+
+
+6. Roadmap de Implementação
+---------------------------
+- Curto prazo: FSM blindada (já aplicada na Carla).
+- Médio prazo: adicionar trava de CTA + classificação simples de intenção (regex).
+- Longo prazo: migrar para arquitetura completa de intents + tools + telemetry.
+

@@ -1,0 +1,161 @@
+
+# Guia Técnico — Ajustes da IA Lívia
+**Objetivo:** Garantir que a IA Lívia responda de forma contextualizada, sem repetir mensagens, sem enviar links fora de hora e mantendo o foco no que o lead pediu.
+
+---
+
+## 1. Problemas Atuais
+- Respostas repetitivas.
+- Links enviados sem relação com a pergunta.
+- Falta de interpretação correta das intenções.
+- Perda de contexto ao longo da conversa.
+
+---
+
+## 2. Causas Principais
+
+### 2.1 Regras de CTA mal configuradas
+Se a IA estiver instruída a “sempre enviar o link”, mesmo sem intenção clara, isso gera respostas fora de contexto.
+
+### 2.2 Falta de classificação de intenção
+Sem identificar a intenção do lead, o modelo assume que tudo é uma oportunidade de compra.
+
+### 2.3 Contexto mal gerenciado
+Enviar pouco ou nenhum histórico para o modelo faz ele “esquecer” o estágio atual do funil.
+
+### 2.4 Configurações do modelo
+Temperatura alta, prompts genéricos e ausência de limites de repetição geram comportamento imprevisível.
+
+---
+
+## 3. Solução Completa
+
+### 3.1 Implementar “Trava de CTA”
+A Lívia só enviará links se houver intenção clara de compra:
+
+function hasPurchaseIntent(text) {
+  const t = (text || '').toLowerCase();
+  return [
+    'quero comprar','como compro','onde compro','link','checkout','finalizar',
+    'pagar','pix','cartão','boleto','enviar endereço','fechar pedido'
+  ].some(k => t.includes(k));
+}
+
+function shouldSendLink({ intent, lastIntent, stage, text }) {
+  const stageOk = ['fechamento','oferta-confirmada'].includes(stage);
+  const intentOk = ['fechar','pagar','checkout'].includes(intent) || hasPurchaseIntent(text);
+  const notSpam = lastIntent !== 'checkout';
+  return stageOk && intentOk && notSpam;
+}
+
+---
+
+### 3.2 Criar Classificação de Intenção (Híbrida)
+
+function ruleIntent(text) {
+  const t = (text||'').toLowerCase();
+  if (/(liso|ondulado|cacheado|crespo|quimica|formol|frizz|volume)/.test(t)) return 'caracteristica_cabelo';
+  if (/(preço|custa|valor)/.test(t)) return 'preco';
+  if (/(prazo|entrega|chega|dias)/.test(t)) return 'entrega';
+  if (/(pix|cartão|boleto|parcel|pagamento)/.test(t)) return 'pagamento';
+  if (/(compro|link|checkout|finalizar|fechar)/.test(t)) return 'checkout';
+  return 'outro';
+}
+
+Se as regras não identificarem a intenção, um fallback com LLM pode ser usado para rotular a frase.
+
+---
+
+### 3.3 Roteamento por Etapa + Intenção
+
+const handlers = {
+  qualify: {
+    caracteristica_cabelo: ({text}) =>
+      `Perfeito! Sendo crespo, a progressiva reduz volume e define melhor. Quer reduzir **muito** o volume ou só facilitar a escova?`,
+    preco: () => `Sai por R$ 170 no Pix ou cartão. Quer ver as opções?`,
+    entrega: () => `Prazo médio: 3 a 7 dias úteis para capitais.`,
+    pagamento: () => `Aceitamos Pix, cartão e boleto. Tem preferência?`,
+    checkout: () => `Posso gerar seu link, quer finalizar agora?`,
+    outro: () => `Entendi. Você quer alisar mais ou só dar disciplina aos fios?`
+  },
+  fechamento: {
+    checkout: () => `Aqui está o link de pagamento seguro: <URL>. Qualquer dúvida fico aqui.`,
+    entrega: () => `Entrega em 3–7 dias úteis. Vou te enviar o link pra finalizar, ok?`,
+    preco: () => `R$ 170. Te mando o link pra concluir com esse valor.`
+  }
+};
+
+---
+
+### 3.4 Prompt do Sistema com Âncoras
+
+- Responda apenas ao que foi perguntado.
+- Nunca envie links se não houver intenção clara de compra.
+- Nunca repita links consecutivamente.
+- Após responder, volte ao objetivo da etapa atual com uma frase curta.
+- Se o lead mencionar tipo de cabelo, responda isso antes de qualquer outra coisa.
+
+Configurações recomendadas:
+
+temperature: 0.3,
+top_p: 0.9,
+frequency_penalty: 0.2
+
+---
+
+### 3.5 Contexto Correto
+
+const sys = buildSystemForStage(stage);
+const messages = [
+  { role: 'system', content: sys },
+  ...history.slice(-3),
+  { role: 'user', content: userText }
+];
+
+Sempre envie **apenas os últimos 2 a 3 turnos** para manter coerência.
+
+---
+
+### 3.6 Telemetry para Monitoramento
+
+Registrar para cada resposta:
+- Etapa atual;
+- Intenção detectada;
+- Link enviado (sim/não);
+- Texto do lead;
+- Resposta da IA.
+
+Isso ajuda a rastrear quando a IA sai do comportamento esperado.
+
+---
+
+## 4. Resultado Esperado
+
+**Exemplo real:**  
+Lead: “meu cabelo é crespo”  
+- Intenção → `caracteristica_cabelo`
+- Etapa → `qualify`
+- Resposta:  
+  “Perfeito! Sendo crespo, a progressiva reduz volume e define melhor. Quer reduzir **muito** o volume ou só facilitar a escova?”
+
+Nenhum link enviado.
+
+---
+
+## 5. Benefícios
+- Respostas contextuais e diretas.
+- Links apenas quando realmente necessário.
+- Conversa mais natural e coerente.
+- Base sólida para evoluir a IA no futuro.
+
+---
+
+## 6. Próximos Passos
+1. Integrar esse fluxo nos arquivos fracionados.
+2. Configurar telemetry para análises.
+3. Testar comportamento real com leads.
+4. Ajustar prompts com base nos dados.
+
+---
+
+**Documento referencial — versão estável**

@@ -1,14 +1,11 @@
-// src/flows/offer.js — refinado: objeções + dúvidas + anti-duplicata + polimento
+// src/flows/offer.js — patch final completão
 import { model } from '../model.js';
 import { logEvent } from '../telemetry.js';
 import { getMemory, setMemory } from '../memory.js';
 import { polishReply } from '../utils/polish.js';
 
-// Prices
 const PRICE_ORIGINAL = Number(process.env.PRICE_ORIGINAL || 197);
 const PRICE_PROMO    = Number(process.env.PRICE_TARGET   || 170);
-
-// Anti-duplicata (não repetir a mesma resposta em sequência por 2min)
 const ANTI_DUP_TTL_MS = 2 * 60 * 1000;
 
 // -----------------------------------------------------------------------------
@@ -19,7 +16,6 @@ function oneQuestionOnly(answer = '') {
   if (parts.length <= 2) return s.trim();
   return (parts.slice(0, 2).join('?') + (s.endsWith('?') ? '?' : '')).trim();
 }
-
 function benefitByHairType(hairType) {
   const t = (hairType || '').toLowerCase();
   if (t.includes('liso'))      return 'liso alinhado sem precisar chapinha todo dia';
@@ -28,14 +24,13 @@ function benefitByHairType(hairType) {
   if (t.includes('crespo'))    return 'redução de volume e fios macios';
   return 'cabelo alinhado, macio e com brilho de salão';
 }
-
 async function filterDuplicateReply(userId, reply, key = 'lastOfferReply') {
   try {
     const mem = (await getMemory(userId)) || {};
     const now = Date.now();
     const last = mem[key] || { text: '', at: 0 };
     if (reply && last.text === reply && now - (last.at || 0) < ANTI_DUP_TTL_MS) {
-      return null; // indica para usar uma variante curta
+      return null;
     }
     await setMemory(userId, { ...mem, [key]: { text: reply, at: now } });
   } catch {}
@@ -45,25 +40,34 @@ async function filterDuplicateReply(userId, reply, key = 'lastOfferReply') {
 // -----------------------------------------------------------------------------
 // Detectores
 function isOffensive(text = '') {
-  return /(vai se f|merda|porra|caralh|burra|idiot|otári|imbecil)/i.test((text || '').toLowerCase());
+  return /(vai se f|merda|porra|caralh|burra|idiot|otári|imbecil)/i.test(text.toLowerCase());
 }
 function isDuvidaVaga(text = '') {
-  return /(não sei|nao sei|será que|sera que|tenho dúvida|tenho duvida)/i.test((text || '').toLowerCase());
+  return /(não sei|nao sei|será que|sera que|tenho dúvida|tenho duvida)/i.test(text.toLowerCase());
 }
 function isObjectionFunciona(text = '') {
-  return /(será que funciona|sera que funciona|funciona mesmo|funciona\?|funcionar)/i.test((text || '').toLowerCase());
+  return /(funciona|funcionar)/i.test(text.toLowerCase());
 }
 function isObjectionEstraga(text = '') {
-  return /(estraga|danifica|cair.*cabelo|quebra.*cabelo|resseca)/i.test((text || '').toLowerCase());
+  return /(estraga|danifica|cair.*cabelo|quebra.*cabelo|resseca)/i.test(text.toLowerCase());
 }
 function isObjectionAnvisa(text = '') {
-  return /(anvisa|é autorizado|e autorizado|registro.*anvisa|liberado pela anvisa)/i.test((text || '').toLowerCase());
+  return /(anvisa|autorizado|registro.*anvisa|liberado)/i.test(text.toLowerCase());
 }
 function isAskHowToUse(text = '') {
-  return /(como usa|como utilizar|modo de uso|passo a passo|aplicar|aplicação)/i.test((text || '').toLowerCase());
+  return /(como usa|como utilizar|modo de uso|passo a passo|aplicar|aplicação)/i.test(text.toLowerCase());
 }
 function isAskDifferential(text = '') {
-  return /(qual .*diferencial|por que melhor|por que escolher|o que tem de diferente|diferença)/i.test((text || '').toLowerCase());
+  return /(diferencial|por que melhor|o que tem de diferente|diferença)/i.test(text.toLowerCase());
+}
+function isAskMl(text = '') {
+  return /(quantos ml|quantidade|ml tem)/i.test(text.toLowerCase());
+}
+function isAskDuracao(text = '') {
+  return /(quanto dura|duração|tempo dura|meses)/i.test(text.toLowerCase());
+}
+function isDiscountOrKit(text = '') {
+  return /(desconto|promoção|promo|levar dois|kit|família|family)/i.test(text.toLowerCase());
 }
 
 // -----------------------------------------------------------------------------
@@ -72,77 +76,81 @@ export async function offer({ text, context, prompts, productPrompt, price = PRI
   const userMsgRaw = (text || '').trim();
   const userId     = (context && context.userId) || 'unknown';
 
-  // 0) Ofensa → encerrar educado (sem vender)
+  // 0) Ofensa
   if (isOffensive(userMsgRaw)) {
-    const reply =
-      'Entendo que você possa estar chateada 💕. Se preferir, podemos encerrar por aqui. ' +
-      'Se quiser conversar sobre o produto em outro momento, estarei aqui pra te ajudar. Tudo bem?';
+    const reply = 'Entendo que você possa estar chateada 💕. Se preferir, podemos encerrar por aqui. Se quiser conversar sobre o produto em outro momento, estarei aqui pra te ajudar. Tudo bem?';
     logEvent({ userId, event: 'ofensa_detectada', payload: { stage: 'offer' } });
     return polishReply(reply, { closingHint: 'offer' });
   }
 
-  // 1) Dúvida vaga → acolhimento
+  // 1) Dúvida vaga
   if (isDuvidaVaga(userMsgRaw)) {
-    const reply =
-      `Eu entendo sua dúvida 💕. Pode ficar tranquila: é seguro, sem formol, e você só paga quando receber (COD). ` +
-      `Hoje está de R$ ${PRICE_ORIGINAL} por R$ ${PRICE_PROMO}. Quer que eu te mostre depoimentos reais de clientes?`;
+    const reply = `Eu entendo sua dúvida 💕. Pode ficar tranquila: é seguro, sem formol, e você só paga quando receber (COD). Hoje está de R$ ${PRICE_ORIGINAL} por R$ ${PRICE_PROMO}. Quer que eu te mostre depoimentos reais de clientes?`;
     const safe = await filterDuplicateReply(userId, reply);
     logEvent({ userId, event: 'objection_tratada', payload: { tipo: 'duvida_vaga' } });
     return polishReply(safe || reply, { closingHint: 'offer' });
   }
 
-  // 2) Objeções específicas
+  // 2) Objeções clássicas
   if (isObjectionFunciona(userMsgRaw)) {
-    const reply =
-      'Sim, funciona de verdade 💕. Ele reduz o frizz e deixa o cabelo alinhado com acabamento natural — ' +
-      'muitas clientes mandam fotos depois, amaram o resultado. Quer que eu te explique como aplicar pra potencializar o efeito?';
+    const reply = 'Sim, funciona de verdade 💕. Ele reduz o frizz e deixa o cabelo alinhado com acabamento natural — muitas clientes mandam fotos depois. Quer que eu te explique como aplicar pra potencializar o efeito?';
     const safe = await filterDuplicateReply(userId, reply);
     logEvent({ userId, event: 'objection_tratada', payload: { tipo: 'funciona' } });
     return polishReply(safe || reply, { closingHint: 'offer' });
   }
-
   if (isObjectionEstraga(userMsgRaw)) {
-    const reply =
-      'Pode ficar tranquila 💕. A fórmula é sem formol e pensada pra alinhar e dar brilho sem ressecar. ' +
-      'Eu te passo o passo a passo seguro pra aplicar em casa. Quer?';
+    const reply = 'Pode ficar tranquila 💕. A fórmula é sem formol e pensada pra alinhar e dar brilho sem ressecar. Eu te passo o passo a passo seguro pra aplicar em casa. Quer?';
     const safe = await filterDuplicateReply(userId, reply);
     logEvent({ userId, event: 'objection_tratada', payload: { tipo: 'seguranca' } });
     return polishReply(safe || reply, { closingHint: 'offer' });
   }
-
   if (isObjectionAnvisa(userMsgRaw)) {
-    const reply =
-      'Sim, trabalhamos com produtos liberados para comercialização no Brasil 💕. ' +
-      'Se quiser, te envio o número de registro e orientações de uso recomendadas. Quer conferir?';
+    const reply = 'Sim, trabalhamos com produtos liberados para comercialização no Brasil 💕. Se quiser, te envio o número de registro e orientações de uso. Quer conferir?';
     const safe = await filterDuplicateReply(userId, reply);
     logEvent({ userId, event: 'objection_tratada', payload: { tipo: 'anvisa' } });
     return polishReply(safe || reply, { closingHint: 'offer' });
   }
 
-  // 3) Perguntas informativas (sem link)
+  // 3) Perguntas informativas consultivas
   if (isAskHowToUse(userMsgRaw)) {
-    const reply =
-      'A aplicação é simples: lave, seque 80%, aplique mecha a mecha, deixe agir conforme o rótulo e finalize com escova/chapinha leve. ' +
-      'Quer que eu te mande o passo a passo detalhado por mensagem?';
-    const safe = await filterDuplicateReply(userId, reply);
+    const reply = 'A aplicação é simples: lave, seque 80%, aplique mecha a mecha, deixe agir conforme o rótulo e finalize com escova/chapinha leve. Quer que eu mande o passo a passo detalhado?';
     logEvent({ userId, event: 'faq_respondida', payload: { tipo: 'como_usar' } });
-    return polishReply(safe || reply, { closingHint: 'offer' });
+    return polishReply(reply, { closingHint: 'offer' });
   }
-
   if (isAskDifferential(userMsgRaw)) {
-    const reply =
-      'O diferencial é o alinhamento com aparência natural, sem formol, reduzindo frizz e deixando o toque macio e com brilho. ' +
-      'Além disso, o pagamento é só na entrega (COD). Quer garantir com o valor promocional?';
-    const safe = await filterDuplicateReply(userId, reply);
+    const reply = 'O diferencial é o alinhamento natural, sem formol, reduzindo frizz e deixando macio e brilhante. Quer garantir pelo valor promocional?';
     logEvent({ userId, event: 'faq_respondida', payload: { tipo: 'diferencial' } });
-    return polishReply(safe || reply, { closingHint: 'offer' });
+    return polishReply(reply, { closingHint: 'offer' });
+  }
+  if (isAskMl(userMsgRaw)) {
+    const reply = 'O frasco vem com 500ml, suficiente para até 3 meses de uso 💕. Quer que eu te mostre como aproveitar melhor o rendimento?';
+    logEvent({ userId, event: 'faq_respondida', payload: { tipo: 'ml' } });
+    return polishReply(reply, { closingHint: 'offer' });
+  }
+  if (isAskDuracao(userMsgRaw)) {
+    const reply = 'O efeito dura em média até 3 meses, dependendo da rotina e dos cuidados. Quer que eu te mostre dicas pra manter o resultado por mais tempo?';
+    logEvent({ userId, event: 'faq_respondida', payload: { tipo: 'duracao' } });
+    return polishReply(reply, { closingHint: 'offer' });
   }
 
-  // 4) Oferta padrão (sem link)
+  // 4) Kits e desconto
+  if (isDiscountOrKit(userMsgRaw)) {
+    const reply = 'Se levar mais de um, consigo verificar uma condição especial 💕. Posso confirmar quantas unidades você gostaria?';
+    logEvent({ userId, event: 'objection.discount', payload: { texto: userMsgRaw } });
+    return polishReply(reply, { closingHint: 'offer' });
+  }
+
+  // 5) Fallback elegante para aleatórios
+  if (userMsgRaw.split(' ').length <= 3 && !/preç|valor|promo/i.test(userMsgRaw)) {
+    const reply = 'Não tenho certeza sobre isso 💕, mas falando do produto posso te explicar melhor como ele funciona. Quer que eu detalhe?';
+    logEvent({ userId, event: 'fallback_aleatorio', payload: { texto: userMsgRaw } });
+    return polishReply(reply, { closingHint: 'offer' });
+  }
+
+  // 6) Oferta padrão (sem link)
   const memory = (await getMemory(userId)) || {};
   const hairType = memory?.hairType || null;
   const nome     = memory?.name || '';
-
   const precoLinha = `de R$ ${PRICE_ORIGINAL} por R$ ${PRICE_PROMO}`;
   const prazoLinha = 'Entrega rápida: até 24h (capitais) ou 2 dias úteis (demais cidades).';
   const codLinha   = 'Pagamento só quando receber em mãos (COD).';
@@ -174,28 +182,11 @@ export async function offer({ text, context, prompts, productPrompt, price = PRI
   let reply = await model.chat(messages, { maxTokens: 180, temperature: 0.55 });
   reply = oneQuestionOnly(String(reply || '').trim());
 
-  // Fallback seguro
   if (!reply || reply.length < 20 || /https?:\/\//i.test(reply)) {
-    reply =
-      `${nome ? nome + ', ' : ''}olha só: ${precoLinha}, ` +
-      `com ${benefitByHairType(hairType)}. ${codLinha} ${prazoLinha} ${urgencia} ` +
-      'Quer garantir o seu pelo valor promocional?';
+    reply = `${nome ? nome + ', ' : ''}olha só: ${precoLinha}, com ${benefitByHairType(hairType)}. ${codLinha} ${prazoLinha} ${urgencia} Quer garantir o seu pelo valor promocional?`;
   }
 
-  logEvent({
-    userId,
-    event: 'oferta_mostrada',
-    payload: {
-      hairType,
-      preview: reply.slice(0, 160),
-      price_original: PRICE_ORIGINAL,
-      price_promo: PRICE_PROMO
-    }
-  });
-
+  logEvent({ userId, event: 'oferta_mostrada', payload: { hairType, preview: reply.slice(0,160), price_original: PRICE_ORIGINAL, price_promo: PRICE_PROMO } });
   const safe = await filterDuplicateReply(userId, reply);
-  return polishReply(
-    safe || `Está ${precoLinha}. ${codLinha} ${prazoLinha}. Quer garantir o seu pelo valor promocional?`,
-    { closingHint: 'offer' }
-  );
+  return polishReply(safe || `Está ${precoLinha}. ${codLinha} ${prazoLinha}. Quer garantir o seu pelo valor promocional?`, { closingHint: 'offer' });
 }

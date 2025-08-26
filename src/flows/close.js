@@ -66,7 +66,6 @@ async function filterDuplicateReply(userId, reply) {
     const now = Date.now();
     const last = mem.lastCloseReply || { text: '', at: 0 };
     if (reply && last.text === reply && now - (last.at || 0) < ANTI_DUP_TTL_MS) {
-      // troca por uma variante curtinha para não repetir a mesma
       return null; // indica para gerar fallback variante
     }
     await setMemory(userId, { ...mem, lastCloseReply: { text: reply, at: now } });
