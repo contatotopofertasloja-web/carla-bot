@@ -1,91 +1,92 @@
-// src/flows/close.js — revisado e pronto pra produção
+// src/flows/close.js — FSM: fechamento + pós-venda (cupom fidelidade)
 import { model } from '../model.js';
 import { logEvent } from '../telemetry.js';
 
-const DEFAULT_CHECKOUT =
+const CHECKOUT_LINK =
   process.env.CHECKOUT_LINK ||
   'https://entrega.logzz.com.br/pay/memmpxgmg/progcreme170';
 
-const DEFAULT_COUPON =
+const COUPON_CODE =
   process.env.COUPON_CODE ||
   'TOP-AGO2025-PROGRVG-150';
 
-// Garante que a saída tenha no máximo 1 pergunta
-function enforceSingleQuestion(answer = '') {
-  const parts = String(answer).split('?');
-  if (parts.length <= 2) return String(answer).trim();
-  return (parts.slice(0, 2).join('?') + (answer.endsWith('?') ? '?' : '')).trim();
+// Garante no máximo 1 pergunta
+function oneQuestionOnly(answer = '') {
+  const s = String(answer);
+  const parts = s.split('?');
+  if (parts.length <= 2) return s.trim();
+  return (parts.slice(0, 2).join('?') + (s.endsWith('?') ? '?' : '')).trim();
 }
 
+// Detecta se cliente falou de comprovante/pagamento feito
 function detectComprovante(text = '') {
   const t = (text || '').toLowerCase();
-  return /(paguei|pago|comprovante|comprovação|enviei.*print|mandei.*print|enviei.*comprovante|mande[iu].*comprovante)/i.test(t);
+  return /(paguei|pago|comprovante|print|enviei.*comprovante|mandei.*comprovante)/i.test(t);
 }
 
 export async function closeDeal({ text, context, prompts, productPrompt, price = 170 }) {
   const user = (text || '').trim();
   const userId = (context && context.userId) || 'unknown';
 
-  // BRANCH 1 — Cliente indicou/enviou comprovante → Pós-pagamento (008)
+  // BRANCH 1 — Comprovante → Pós-venda
   if (detectComprovante(user)) {
-    const sysPos =
+    const sys =
       prompts.persona +
       prompts.styleRules +
       '\n[NUNCA REVELAR IDENTIDADE TÉCNICA]\n' +
-      'Nunca revele que é IA/assistente. Aja sempre como vendedora humana da TopOfertas Express.\n' +
-      '[ORIENTAÇÃO DE FLUXO]\n' +
-      'Etapa 8 (Pós-pagamento). Use 008_pos_pagamento.json como base: confirmar recebimento do print, agradecer, ' +
-      `informar que o comprovante foi registrado automaticamente e liberar o cupom de R$150 (código: ${DEFAULT_COUPON}), válido por 3 meses.\n` +
-      'Tom curto, carinhoso e objetivo. Sem dúvidas técnicas agora.\n' +
+      'Nunca diga que é IA. Aja sempre como vendedora humana da TopOfertas Express.\n' +
+      '[ETAPA 8 — Pós-venda]\n' +
+      `Confirme recebimento do print, agradeça e libere o cupom fidelidade de R$150 (código: ${COUPON_CODE}), válido por 3 meses.\n` +
+      'Seja calorosa e finalize com um gesto de cuidado (ex.: “qualquer coisa, me chama aqui”).\n' +
       productPrompt({ price });
 
-    const messagesPos = [
-      { role: 'system', content: sysPos },
+    const messages = [
+      { role: 'system', content: sys },
       {
         role: 'user',
-        content:
-          `Mensagem do cliente: "${user}"\n` +
-          'Responda confirmando o print, validando o pedido e liberando o cupom de R$150. ' +
-          'Finalize com um gesto de cuidado (ex.: “qualquer coisa, me chama aqui”).'
+        content: `Mensagem do cliente: "${user}"\n
+Responda confirmando o print, validando o pedido e liberando o cupom fidelidade.`
       }
     ];
 
-    const replyPos = await model.chat(messagesPos, { maxTokens: 160, temperature: 0.6 });
+    let reply = await model.chat(messages, { maxTokens: 160, temperature: 0.6 });
+    reply = oneQuestionOnly(reply);
 
-    // Telemetry (pós)
-    logEvent({ userId, event: 'pos_pagamento_enviado', payload: { preview: String(replyPos).slice(0, 160) } });
-    logEvent({ userId, event: 'cupom_liberado', payload: { cupom: DEFAULT_COUPON } });
+    // Telemetry pós
+    logEvent({ userId, event: 'pos_pagamento_enviado', payload: { preview: reply.slice(0, 120) } });
+    logEvent({ userId, event: 'cupom_liberado', payload: { cupom: COUPON_CODE } });
 
-    return enforceSingleQuestion(replyPos);
+    return reply;
   }
 
-  // BRANCH 2 — Fechamento normal com link (007)
-  const sysClose =
+  // BRANCH 2 — Fechamento normal
+  const sys =
     prompts.persona +
     prompts.styleRules +
     '\n[NUNCA REVELAR IDENTIDADE TÉCNICA]\n' +
-    'Nunca revele que é IA/assistente. Aja sempre como vendedora humana da TopOfertas Express.\n' +
-    '[ORIENTAÇÃO DE FLUXO]\n' +
-    'Etapa 7 (Fechamento). Use 007_fechamento_conversa.json como base: CTA com link de checkout, urgência (estoque/lote), prazos (24h capitais / até 2 dias demais) e segurança (pagamento só no recebimento). ' +
-    `Use este link oficial: ${DEFAULT_CHECKOUT}. ` +
-    'Finalize com APENAS 1 pergunta.\n' +
+    'Nunca diga que é IA. Aja sempre como vendedora humana da TopOfertas Express.\n' +
+    '[ETAPA 7 — Fechamento]\n' +
+    `Use o link oficial: ${CHECKOUT_LINK}\n` +
+    'Monte CTA persuasivo: preço promocional, urgência (estoque/lote), prazos (24h capitais / 2 dias demais), COD (pagamento só na entrega).\n' +
+    'Finalize com apenas 1 pergunta curta.\n' +
     productPrompt({ price });
 
-  const messagesClose = [
-    { role: 'system', content: sysClose },
+  const messages = [
+    { role: 'system', content: sys },
     {
       role: 'user',
       content:
         `Mensagem do cliente: "${user}"\n` +
-        `Monte 1 frase de fechamento com o link ${DEFAULT_CHECKOUT}, urgência e segurança (COD). ` +
-        'Finalize com somente 1 pergunta objetiva.'
+        `Monte 1 frase de fechamento com o link ${CHECKOUT_LINK}, urgência e COD.\n` +
+        'Finalize com 1 pergunta objetiva.'
     }
   ];
 
-  const replyClose = await model.chat(messagesClose, { maxTokens: 160, temperature: 0.65 });
+  let reply = await model.chat(messages, { maxTokens: 160, temperature: 0.65 });
+  reply = oneQuestionOnly(reply);
 
-  // Telemetry (checkout)
-  logEvent({ userId, event: 'checkout_enviado', payload: { link: DEFAULT_CHECKOUT } });
+  // Telemetry fechamento
+  logEvent({ userId, event: 'checkout_enviado', payload: { link: CHECKOUT_LINK } });
 
-  return enforceSingleQuestion(replyClose);
+  return reply;
 }

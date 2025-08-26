@@ -1,61 +1,67 @@
-// src/flows/qualify.js
+// src/flows/qualify.js — versão FSM amigável
 import { model } from '../model.js';
 import { logEvent } from '../telemetry.js';
 
-function detectMapeamentoPergunta(text = '') {
+// detecta tipo de cabelo
+function detectHairType(text = '') {
   const t = text.toLowerCase();
-  // gatilhos típicos de mapeamento (002_mapeamento_cabelo)
-  return /(tipo de cabelo|seu cabelo|é liso|ondulado|cachead|crespo|caracolado|volume|alinhado)/i.test(t);
+  if (/liso/.test(t)) return "liso";
+  if (/ondulad/.test(t)) return "ondulado";
+  if (/cachead|caracolad/.test(t)) return "cacheado";
+  if (/cresp/.test(t)) return "crespo";
+  return null;
 }
 
-function detectDorPergunta(text = '') {
+// detecta menção a dor
+function detectDor(text = '') {
   const t = text.toLowerCase();
-  // gatilhos típicos de dor (003_dor_personalizada)
   return /(frizz|arma|chapinha|escova|definiç|ressecad|quebra|tempo|umidade|indefinid)/i.test(t);
 }
 
 export async function qualify({ text, context, prompts, productPrompt }) {
+  const userId = (context && context.userId) || 'unknown';
+  const hairType = detectHairType(text);
   const sys =
     prompts.persona +
     prompts.styleRules +
-    // reforço explícito de identidade humana
     '\n[NUNCA REVELAR IDENTIDADE TÉCNICA]\n' +
-    'Nunca revele que é IA/assistente. Apresente-se e aja sempre como vendedora humana da TopOfertas Express.\n' +
-    // dica para o modelo consultar os blocos corretos
+    'Nunca diga que é IA/assistente. Aja sempre como vendedora humana da TopOfertas Express.\n' +
     '[ORIENTAÇÃO DE FLUXO]\n' +
-    'Nesta etapa, faça 1–2 perguntas curtas: primeiro mapeie o tipo de cabelo (use 002_mapeamento_cabelo.json) e/ou explore a dor (use 003_dor_personalizada.json) conforme o contexto. Reescreva no seu estilo, sem copiar literal. Finalize com 1 pergunta objetiva.\n' +
+    'Nesta etapa do funil, se ainda não identificou o tipo de cabelo → faça UMA pergunta objetiva para descobrir. ' +
+    'Se já identificou o tipo de cabelo → faça UMA pergunta sobre a dor principal (frizz, volume, chapinha, falta de definição). ' +
+    'Nunca repita a mesma pergunta se já foi respondida. ' +
+    'Finalizar sempre com apenas UMA pergunta curta.\n' +
     productPrompt({ price: process.env.PRICE_TARGET || 170 });
 
-  const user = (text || '').trim();
+  let user = (text || '').trim();
 
   const messages = [
     { role: 'system', content: sys },
     {
       role: 'user',
       content: `Mensagem do cliente: "${user}"
-Faça 1 ou 2 perguntas rápidas para entender o TIPO DE CABELO/OBJETIVO e (se fizer sentido) a DOR principal (ex.: frizz, volume, chapinha diária, falta de definição).
-- Tom: curto, empático, consultivo (1–2 frases, máx. 3 linhas).
-- Evite parecer interrogatório.
-- Termine com apenas UMA pergunta.`,
+Responda em tom curto, empático e consultivo:
+- Se ainda não tenho o tipo de cabelo, pergunte isso.
+- Se já tenho, explore apenas a dor principal.
+- Use no máximo 2 frases.
+- Termine sempre com 1 pergunta objetiva.`,
     },
   ];
 
-  const reply = await model.chat(messages, { maxTokens: 180, temperature: 0.65 });
+  const reply = await model.chat(messages, { maxTokens: 160, temperature: 0.65 });
 
-  // ---- Telemetry: o que foi perguntado nessa etapa?
-  const userId = (context && context.userId) || 'unknown';
-  if (detectMapeamentoPergunta(String(reply))) {
+  // ---- Telemetry
+  if (!hairType) {
     logEvent({
       userId,
       event: 'mapeamento_pergunta_enviada',
       payload: { preview: String(reply).slice(0, 120) }
     });
-  }
-  if (detectDorPergunta(String(reply))) {
+  } else if (detectDor(String(reply))) {
     logEvent({
       userId,
       event: 'dor_pergunta_enviada',
-      payload: { preview: String(reply).slice(0, 120) }
+      payload: { preview: String(reply).slice(0, 120), hairType }
     });
   }
 
