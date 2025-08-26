@@ -1,0 +1,58 @@
+{
+  "name": "DADOS_TECNICOS_PRODUTO",
+  "version": "1.0.0",
+  "description": "Informações técnicas, composição, modo de uso e precauções da Progressiva Vegetal Premium.",
+  "instructions": "Use este bloco somente quando a cliente perguntar sobre composição, ingredientes, modo de uso detalhado ou precauções. Reescreva de forma natural, simplificando quando necessário. Não use para oferta, preço ou fechamento.",
+  "data": {
+    "resumo": "A Progressiva Vegetal Premium é um tratamento capilar profissional para todos os tipos de cabelo. Promete liso perfeito e duradouro, brilho instantâneo e é totalmente sem formol.",
+    "composicao": [
+      "Aqua/Water",
+      "Hydroxyethyl Celulose",
+      "Hidroxypropyl Guar",
+      "Cetearyl Alcohol",
+      "Behentrimonium Chloride",
+      "Behentrimonium Methosulfate (and) Cetearyl Alcohol",
+      "Cetearyl Olivate (and) Sorbitan Olivate",
+      "Mineral Oil",
+      "Polyquaternium-7",
+      "Sericin",
+      "Guar Hydroxypropyltrimonium Chloride",
+      "Cetrimonium Chloride",
+      "Glyoxyloyl Carbocysteine",
+      "Glyoxyloyl Keratin Amino Acids",
+      "Lactic Acid",
+      "Petrolatum",
+      "Acid Violeta 43",
+      "Lanolin",
+      "Poliquaternium-67",
+      "Phenoxyethanol",
+      "Fragrance"
+    ],
+    "modo_de_uso": [
+      "Lavar os cabelos 3 vezes com shampoo antirresíduos.",
+      "Enxaguar para retirar todo o excesso de shampoo.",
+      "Remover o excesso de água e aplicar o tratamento térmico mecha a mecha, alinhando com pente fino e retirando o excesso.",
+      "Deixar agir por 40 minutos.",
+      "Secar completamente com secador.",
+      "Finalizar com prancha em mechas finas, passando de 4 a 8 vezes por mecha."
+    ],
+    "precaucoes": [
+      "Aplicar o produto respeitando 1 cm da raiz.",
+      "Certificar-se de que os cabelos estejam totalmente secos antes de usar a prancha.",
+      "Manter fora do alcance de crianças e animais domésticos.",
+      "Em caso de contato acidental com os olhos, lavar com água em abundância.",
+      "Em caso de irritação ou efeitos indesejáveis, suspender o uso e procurar orientação médica.",
+      "Uso externo."
+    ],
+    "fabricante": {
+      "distribuidor": "Havana Comercio LTDA",
+      "sac_email": "havanadigital@comercio.com",
+      "cnpj": "05.318.754/0001-08",
+      "industria": "Brasileira",
+      "autorizacoes": [
+        "Aut. MS Nº 2.04.784-1",
+        "RES.ANVS. Nº processo: 25351.020110/2025-03"
+      ]
+    }
+  }
+}

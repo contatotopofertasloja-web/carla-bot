@@ -1,0 +1,125 @@
+Boa, parça 👌🔥.
+Aqui vai o resumão de tudo que fizemos na Carla, já pensado pra você replicar em novas “meninas” (Lívia, Melissa, Sofia etc.), sem deixar nada escapar:
+
+---
+
+ 📌 Resumo — Configuração da Carla
+
+ 1. Ambiente & Deploy
+
+ Node/NVM configurado:
+
+   Node 18 → Baileys (WhatsApp).
+   Node 20 → opcional (GPT).
+ Dependências instaladas: Express, Baileys, QRCode, Dotenv, OpenAI.
+ .env configurado:
+
+   `OPENAI_API_KEY`, `MODEL_NAME`, `PRICE_TARGET`, `WPP_AUTH_DIR`, `MEMORY_TTL_DAYS`, `PORT`.
+ Sessão persistente:
+
+   Local: `./.wpp-auth`.
+   Railway: `WPP_AUTH_DIR=/app/baileys-auth` + Volume persistente.&x20;
+
+---
+
+ 2. Estrutura de Arquivos
+
+ 000\_Fluxo\_Orientação\_Conversas.json → fonte da verdade (persona, produto, fluxo, extras, guardrails).
+ 001–008 → etapas do funil (abertura → pós-pagamento).
+ 009–010 → blocos transversais (dados técnicos + logística).
+ 011 → segunda compra (recompra R\$150).
+ 012 → remarketing (para tráfego pago).
+ base.js → carrega 000 (fallback seguro).
+ bot.js → orquestra fluxo, envia foto de abertura, detecta intents diretas, aplica guardrails.
+ flows/ (`greet.js`, `qualify.js`, `offer.js`, `close.js`) → micro-lógicas das etapas.
+ telemetry.js → loga eventos do funil (gargalos, performance).
+
+---
+
+ 3. Persona & Guardrails
+
+ Carla é vendedora real da TopOfertas Express:
+
+   Empática, amiga, consultiva.
+   Sempre fala como humana (nunca revelar que é IA).
+   Usa storytelling: “Eu uso esse produto e recomendo”.
+ Guardrails:
+
+   Não revelar identidade técnica.
+   Pagamento só na entrega (COD).
+   Não falar de processos internos (taxas, configs).
+   Se receber mídia, pedir resumo em texto.&x20;
+
+---
+
+ 4. Fluxo da Conversa
+
+1. Abertura calorosa (001).
+   → Envia foto do produto automaticamente na primeira resposta.
+2. Mapeamento do cabelo (002).
+3. Exploração da dor (003).
+4. Apresentação da solução (004).
+5. Tratamento de objeções (005).
+6. Oferta + benefícios + logística (006).
+7. Fechamento com link (007).
+8. Pós-pagamento: valida print + libera cupom (008).
+
+Extras:
+
+ 009/010 sob demanda (dados técnicos, logística).
+ 011 recompra R\$150 → só para clientes já existentes.
+ 012 remarketing → só em campanhas de tráfego (fora do chat).&x20;
+
+---
+
+ 5. Telemetry
+
+ Criado `telemetry.js` que salva eventos em console + arquivo JSON.
+ `bot.js` já loga:
+
+   `session_start`, `midia_detectada`, `resposta_direta`, `abertura_enviada`, `oferta_mostrada`, `checkout_enviado`, `pos_pagamento_enviado`, `cupom_liberado`, `erro`.
+ flows também logam micro-eventos:
+
+   `greet.js` → `abertura_enviada`.
+   `qualify.js` → `mapeamento_pergunta_enviada`, `dor_pergunta_enviada`.
+   `offer.js` → `oferta_mostrada`.
+   `close.js` → `checkout_enviado`, `pos_pagamento_enviado`, `cupom_liberado`.
+
+Isso permite identificar gargalos do funil (ex.: leads somem na oferta ou no fechamento) e ajustar Carla.&x20;
+
+---
+
+ 6. Testes
+
+ /health responde ok.
+ QR code → pareamento único, sessão persistente.
+ Teste de Webhook (`/webhook`) → Carla responde como esperado.
+ Mensagens reais → fluxo completo validado (saudação → oferta → link → cupom).&x20;
+
+---
+
+ 7. Replicar para novas personas
+
+Para criar uma nova “menina”:
+
+1. Clonar estrutura → duplicar pasta da Carla.
+2. Alterar:
+
+    Persona no `000_Fluxo_Orientação_Conversas.json`.
+    Produto (`name`, `photo_url`, `price`, claims).
+    Arquivos 001–012 → adaptar fluxo para o novo produto/persona.
+3. Manter:
+
+    Guardrails.
+    Telemetry.
+    Estrutura bot + flows.
+4. Deploy no Railway com novo número/instância → para não misturar sessões.
+
+---
+
+👉 Em resumo: já temos o modelo Carla redondo — persona definida, funil claro, blocos organizados, bot.js e flows calibrados, telemetry coletando dados.
+Agora é só clonar essa base, trocar produto/persona, e subir a nova instância (Lívia, Melissa, Sofia).
+
+---
+
+Quer que eu já monte um template base (pasta zipada com 000–012 + bot + flows + telemetry), limpinho, pronto pra você clonar e só preencher os dados da próxima persona?

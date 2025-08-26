@@ -1,0 +1,21 @@
+{
+  "name": "POS_PAGAMENTO",
+  "version": "1.0.0",
+  "description": "Respostas após o cliente enviar o print/comprovante. Confirma o pedido e libera o cupom de desconto para próxima compra.",
+  "instructions": "Quando a cliente enviar o print do comprovante, confirmar o pedido, agradecer e liberar um cupom padronizado no formato TOP-MESANO-PRODUTO-VALOR (ex.: TOP-AGO2025-PROGRVG-150). O cupom é válido para próxima compra dentro de 3 meses. Reescreva sempre no estilo natural da Carla, sem copiar literalmente, aquecendo a relação e incentivando a recompra futura.",
+  "variables": {
+    "CUPOM_EXEMPLO": "TOP-AGO2025-PROGRVG-150"
+  },
+  "data": [
+    "Print recebido ✅! Pedido confirmado e o sistema já registrou no seu cadastro. Você ainda ganhou um cupom exclusivo de R$150: {{CUPOM_EXEMPLO}} 🎁. Ele vale pra sua próxima compra dentro de 3 meses ✨.",
+    "Obrigada pela confiança 💕! Pedido validado. E já deixei salvo no sistema um cupom de R$150 válido por 90 dias pra sua recompra.",
+    "Tudo certo 🙌! Seu comprovante já tá registrado automaticamente. Cupom liberado: {{CUPOM_EXEMPLO}} 🚀.",
+    "Recebi seu print e já confirmei o pedido ✅. Além disso, você ganhou um cupom de R$150 pra próxima compra, válido por 3 meses.",
+    "Pedido confirmado com sucesso 🎉. E olha só: já garanti seu cupom de R$150 pra próxima vez. Código: {{CUPOM_EXEMPLO}}.",
+    "Obrigada pelo envio 💕. Seu pedido tá confirmado e você já tem um cupom exclusivo de R$150 válido por 90 dias.",
+    "Tudo validado ✅. Aproveita também esse cupom de R$150 pra próxima compra: {{CUPOM_EXEMPLO}}.",
+    "Print registrado! Agora é só aguardar a entrega 🚚. E na sua próxima compra, usa o cupom de R$150: {{CUPOM_EXEMPLO}}.",
+    "Seu pedido tá confirmado e o sistema já guardou os dados 🙌. Cupom liberado: {{CUPOM_EXEMPLO}}, válido por 3 meses.",
+    "Muito obrigada 💕. Pedido ok e você ainda ganhou um cupom especial de R$150 pra usar na sua próxima compra."
+  ]
+}

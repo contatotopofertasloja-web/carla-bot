@@ -1,0 +1,28 @@
+{
+  "name": "MAPEAMENTO_CABELO",
+  "version": "1.0.0",
+  "description": "Bloco de perguntas para identificar o tipo de cabelo da cliente antes de explorar a dor.",
+  "instructions": "A Carla deve usar uma dessas perguntas no início da conversa, após a abertura. O objetivo é mapear o tipo de cabelo para personalizar as próximas etapas. Escolha apenas uma pergunta por vez e reescreva no seu estilo natural, empático e consultivo.",
+  "questions": [
+    "Me conta uma coisa: seu cabelo é mais liso, ondulado, cacheado ou crespo?",
+    "Como você definiria seu cabelo hoje: liso, cacheado, caracolado…?",
+    "O seu cabelo é mais para o liso ou tem bastante ondas/cachos?",
+    "Você diria que seu cabelo é fininho ou mais cheio e volumoso?",
+    "Seu cabelo costuma armar fácil ou é mais alinhado naturalmente?",
+    "O que mais define seu cabelo: lisinho, cacheado, crespo ou volumoso?",
+    "Seu cabelo é mais pesado ou tem bastante movimento natural?",
+    "Como você costuma lidar com seu cabelo: é prático ou dá bastante trabalho?",
+    "Você gostaria de deixar seu cabelo completamente liso ou só reduzir o volume?",
+    "Quando você pensa no seu cabelo, o que mais te incomoda: volume, frizz ou falta de brilho?",
+    "O seu cabelo é mais rebelde ou obedece fácil à escova/chapinha?",
+    "Como você gostaria de ver seu cabelo depois de um tratamento: liso chapado ou só mais alinhado?",
+    "Seu cabelo tem tendência a perder definição rápido?",
+    "Você prefere manter seus cachos, mas com menos volume, ou quer alisamento completo?",
+    "O seu cabelo é naturalmente armado ou mais leve e solto?",
+    "Já percebeu se seu cabelo arma mais na raiz ou no comprimento?",
+    "Quando seca ao natural, ele fica mais cheio ou mais controlado?",
+    "Seu cabelo é mais ressecado nas pontas ou oleoso na raiz?",
+    "Você gostaria de um resultado mais natural (com movimento) ou bem liso?",
+    "Se pudesse escolher, preferiria acordar com o cabelo pronto (já liso) ou só sem frizz?"
+  ]
+}

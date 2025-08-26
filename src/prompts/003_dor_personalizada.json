@@ -1,0 +1,44 @@
+{
+  "name": "DOR_PERSONALIZADA",
+  "version": "1.0.0",
+  "description": "Perguntas de diagnóstico de dor por tipo de cabelo para personalizar a conversa antes da apresentação de soluções.",
+  "instructions": "Após identificar o tipo de cabelo (002_mapeamento_cabelo.json), selecione 1–2 perguntas do grupo correspondente e REESCREVA no seu estilo natural (curto, empático e consultivo). Finalize com uma pergunta de encaminhamento (ex.: ‘prefere liso total ou só reduzir volume?’).",
+  "mapping_key": "tipo_cabelo",
+  "data": {
+    "liso": [
+      "Já sentiu que, mesmo liso, seu cabelo arma ou fica com frizz?",
+      "Você precisa usar chapinha quase todo dia para manter o alinhamento?",
+      "Quando seca ao natural, o cabelo perde o brilho rapidinho?",
+      "Você gostaria que o cabelo ficasse mais alinhado sem precisar de tanto esforço?",
+      "Já ficou frustrada porque a escova não dura até o fim do dia?"
+    ],
+    "ondulado": [
+      "O cabelo perde definição rápido e acaba ficando armado?",
+      "Você sente dificuldade em controlar o frizz no dia a dia?",
+      "Gostaria de manter o movimento natural, mas sem tanto volume?",
+      "Já gastou tempo com escova/chapinha e mesmo assim o cabelo não segura?",
+      "Você acha que seu cabelo fica indefinido, nem liso nem cacheado, e isso te incomoda?"
+    ],
+    "cacheado": [
+      "O excesso de volume atrapalha quando você solta os cachos?",
+      "Já ficou chateada porque o frizz aparece logo depois de arrumar?",
+      "Você gostaria de reduzir o volume sem perder o formato dos cachos?",
+      "Seu cabelo demora muito para secar e ainda assim fica cheio?",
+      "Já gastou em produtos que prometiam controle, mas não deram resultado?"
+    ],
+    "crespo": [
+      "Você sente que é difícil manter os fios alinhados por muito tempo?",
+      "O cabelo fica muito armado logo após lavar?",
+      "Gostaria de reduzir o volume sem perder a saúde do fio?",
+      "Já sentiu que químicas mais fortes deixaram o cabelo ressecado ou quebradiço?",
+      "Você gostaria de um resultado mais natural, sem química agressiva?"
+    ],
+    "indefinido": [
+      "Você sente mais dificuldade com frizz ou com volume?",
+      "O que mais incomoda no dia a dia: alinhar os fios ou manter o formato natural?",
+      "Já percebeu se seu cabelo muda muito com a umidade?",
+      "Você gostaria de ter mais praticidade para arrumar o cabelo todos os dias?",
+      "Prefere um resultado liso total ou apenas mais controle e brilho?"
+    ]
+  }
+}

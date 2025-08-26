@@ -1,0 +1,22 @@
+{
+  "name": "SEGUNDA_COMPRA",
+  "version": "1.0.0",
+  "description": "Bloco para clientes que já compraram e estão retornando. Foca em recompra com desconto exclusivo de R$150.",
+  "instructions": "Usar este bloco quando a cliente já tiver comprado anteriormente. Reforçar os resultados obtidos, agradecer a confiança e oferecer o desconto especial de fidelidade. Sempre incluir o link de recompra por R$150. Manter o tom próximo, carinhoso e consultivo.",
+  "variables": {
+    "CHECKOUT_LINK_150": "https://entrega.logzz.com.br/pay/memmpxgmg/progcreme150",
+    "CUPOM_FIDELIDADE": "TOP-AGO2025-PROGRVG-150"
+  },
+  "data": [
+    "E aí, como ficou seu cabelo depois da aplicação? ✨ Que tal já garantir o próximo com desconto exclusivo? Só R$150 pelo link: {{CHECKOUT_LINK_150}}.",
+    "Oi 💕! Você já sabe como a Progressiva Vegetal faz diferença. Agora tem desconto especial pra clientes: só R$150! Link: {{CHECKOUT_LINK_150}}.",
+    "Obrigada por confiar na gente 🙌. Pra recompra, liberei um desconto exclusivo: só R$150. Cupom {{CUPOM_FIDELIDADE}} pelo link {{CHECKOUT_LINK_150}}.",
+    "Seu cabelo merece continuar lindo 💕. Aproveita o benefício de cliente e garante por R$150: {{CHECKOUT_LINK_150}}.",
+    "Já conhece o resultado e sabe que funciona ✨. Recompra com preço especial: só R$150, clique aqui: {{CHECKOUT_LINK_150}}.",
+    "Você já testou e aprovou 🌸. Agora pode manter o resultado por menos: apenas R$150 na recompra. Link: {{CHECKOUT_LINK_150}}.",
+    "Não precisa esperar o efeito acabar 👀. Já garante o próximo kit por R$150: {{CHECKOUT_LINK_150}}.",
+    "Pra clientes fiéis, o preço cai para R$150 🙌. Tá aqui seu acesso: {{CHECKOUT_LINK_150}}.",
+    "Manter o cabelo perfeito custa menos na recompra 💕. Só R$150 no {{CHECKOUT_LINK_150}}.",
+    "Seu cupom exclusivo já tá liberado 🎁: {{CUPOM_FIDELIDADE}}. Use no link {{CHECKOUT_LINK_150}} e pague só R$150."
+  ]
+}

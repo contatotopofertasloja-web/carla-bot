@@ -1,0 +1,28 @@
+{
+  "name": "LOGISTICA",
+  "version": "1.0.0",
+  "description": "Orientações logísticas sobre entrega, COD (pagamento somente no recebimento), rastreio e reagendamento em caso de imprevistos.",
+  "instructions": "Este é um bloco transversal. Pode ser usado como complemento nas etapas 6 (Oferta), 7 (Fechamento) e 8 (Pós-venda). Utilize para reforçar segurança da entrega: prazos (24h capitais, até 2 dias outras localidades), pagamento no recebimento (COD), atualizações de status e possibilidade de reagendar sem custo. Nunca mencionar taxas internas. Reescreva de forma natural e empática.",
+  "data": [
+    "A entrega é agendada e acompanhada com atualizações. Você só paga quando o produto estiver em mãos 😉.",
+    "O legal é que você recebe notificações sobre o status do pedido e paga apenas na hora que receber 🚚.",
+    "Fica tranquila: se houver qualquer imprevisto, dá pra reagendar a entrega sem custo. O pagamento é só no recebimento ✅.",
+    "O sistema envia atualizações de cada etapa da entrega, e você só realiza o pagamento quando estiver com o produto em mãos.",
+    "Você acompanha todo o trajeto do pedido e só paga no ato da entrega, bem seguro 💕.",
+    "Caso não consiga receber no horário previsto, pode remarcar facilmente. O pagamento continua sendo apenas no recebimento.",
+    "O entregador sempre entra em contato antes de chegar, e você só paga quando receber o produto em mãos ✨.",
+    "Você vai receber mensagens com o status do pedido. Só paga no momento da entrega, nada antecipado 😉.",
+    "Se surgir qualquer contratempo, é só reagendar. A compra continua garantida e o pagamento é feito só quando o produto chega.",
+    "Você terá informações do envio até a entrega final. Pagamento apenas no ato da entrega 🚀.",
+    "O pedido é rastreado em tempo real, e você paga apenas quando o produto for entregue a você.",
+    "Entrega rápida e segura: você acompanha por mensagem e paga só quando receber.",
+    "Se por algum motivo não estiver disponível, pode reagendar sem problema. O pagamento só acontece na entrega.",
+    "Você será informado(a) quando o produto sair para entrega, e paga apenas ao receber em mãos 💬.",
+    "Em capitais, a entrega chega até 24h. Fora delas, em até 2 dias. O pagamento é sempre só no recebimento.",
+    "Receba notificações do andamento do pedido e, se não puder receber, reagende tranquilamente. O pagamento é no ato da entrega.",
+    "O entregador pode entrar em contato por WhatsApp ou ligação se houver imprevisto. Você só paga quando o produto estiver com você.",
+    "O pedido tem atualização automática no sistema, mas o pagamento só acontece quando o entregador entregar o produto.",
+    "Mesmo com algum atraso, sua entrega é garantida e o pagamento só será feito quando você tiver o produto em mãos.",
+    "Você acompanha tudo até a entrega final e, se não puder receber, é só reagendar. O pagamento é sempre no ato do recebimento, sem riscos."
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "name": "REMARKETING",
+  "version": "1.0.0",
+  "description": "Bloco para remarketing em campanhas de tráfego. Público que demonstrou interesse mas não finalizou a compra.",
+  "instructions": "Usar este bloco em anúncios de remarketing ou mensagens para leads que não finalizaram a compra. O foco é urgência, entrega rápida, pagamento somente na entrega (COD) e reforço de confiança. Não usar cupom, pois não são clientes ainda.",
+  "variables": {
+    "CHECKOUT_LINK": "https://entrega.logzz.com.br/pay/memmpxgmg/progcreme170"
+  },
+  "data": [
+    "Vi que você se interessou mas não finalizou 👀. Aproveita agora: cabelo perfeito por R$170, entrega rápida e pagamento só na entrega. Link: {{CHECKOUT_LINK}}.",
+    "Não deixa pra depois ✨. Seu cabelo merece ficar alinhado por até 3 meses. Finalize agora: {{CHECKOUT_LINK}}.",
+    "Tá esperando o quê? 😍 É só clicar {{CHECKOUT_LINK}}, confirmar e amanhã mesmo chega na sua casa se for capital.",
+    "Oportunidade ainda disponível 🚀. R$170, pagamento só na entrega e resultado imediato. Link: {{CHECKOUT_LINK}}.",
+    "Seu kit tá quase garantido 🌸. Falta só finalizar no link {{CHECKOUT_LINK}}.",
+    "Entrega expressa: até 24h em capitais, 2 dias demais regiões. Só falta você confirmar aqui: {{CHECKOUT_LINK}}.",
+    "Não precisa de cartão 💳. Pague só quando receber em mãos. Finalize no {{CHECKOUT_LINK}}.",
+    "Já imaginou acordar com o cabelo pronto todos os dias? ✨ Tá ao seu alcance: {{CHECKOUT_LINK}}.",
+    "Últimas unidades do lote atual 🔥. Garante já por R$170: {{CHECKOUT_LINK}}.",
+    "Aproveita antes que acabe: resultado de salão por até 3 meses. Finalize aqui: {{CHECKOUT_LINK}}."
+  ]
+}

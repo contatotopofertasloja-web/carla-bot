@@ -1,20 +1,85 @@
 // src/flows/close.js
 import { model } from '../model.js';
+import { logEvent } from '../telemetry.js';
 
-export async function closeDeal({ text, context, prompts, productPrompt, price }) {
-  const link = context?.checkoutUrl || 'https://exemplo.com/pedido';
-  const sys = prompts.persona + prompts.styleRules + productPrompt({ price });
+const DEFAULT_CHECKOUT =
+  process.env.CHECKOUT_LINK ||
+  'https://entrega.logzz.com.br/pay/memmpxgmg/progcreme170';
 
-  const messages = [
-    { role: 'system', content: sys },
+const DEFAULT_COUPON =
+  process.env.COUPON_CODE ||
+  'TOP-AGO2025-PROGRVG-150';
+
+function detectComprovante(text = '') {
+  const t = text.toLowerCase();
+  return /(paguei|pago|comprovante|comprovação|enviei.*print|mandei.*print|enviei.*comprovante|mande[iu].*comprovante)/i.test(t);
+}
+
+export async function closeDeal({ text, context, prompts, productPrompt, price = 170 }) {
+  const user = (text || '').trim();
+  const userId = (context && context.userId) || 'unknown';
+
+  // BRANCH 1 — Cliente enviou/indicou comprovante → Pós-pagamento (008)
+  if (detectComprovante(user)) {
+    const sysPos =
+      prompts.persona +
+      prompts.styleRules +
+      '\n[NUNCA REVELAR IDENTIDADE TÉCNICA]\n' +
+      'Nunca revele que é IA/assistente. Aja sempre como vendedora humana da TopOfertas Express.\n' +
+      '[ORIENTAÇÃO DE FLUXO]\n' +
+      'Etapa 8 (Pós-pagamento). Use 008_pos_pagamento.json como base: confirmar recebimento do print, agradecer, ' +
+      `informar que o comprovante foi registrado automaticamente e liberar o cupom de R$150 (código: ${DEFAULT_COUPON}), válido por 3 meses.\n` +
+      'Tom curto, carinhoso e objetivo. Sem dúvidas técnicas agora.\n' +
+      productPrompt({ price });
+
+    const messagesPos = [
+      { role: 'system', content: sysPos },
+      {
+        role: 'user',
+        content:
+          `Mensagem do cliente: "${user}"\n` +
+          'Responda confirmando o print, validando o pedido e liberando o cupom de R$150. ' +
+          'Finalize com um gesto de cuidado (ex.: “qualquer coisa, me chama aqui”).'
+      }
+    ];
+
+    const replyPos = await model.chat(messagesPos, { maxTokens: 160, temperature: 0.6 });
+
+    // Telemetry (pós)
+    logEvent({ userId, event: 'pos_pagamento_enviado', payload: { preview: String(replyPos).slice(0, 160) } });
+    logEvent({ userId, event: 'cupom_liberado', payload: { cupom: DEFAULT_COUPON } });
+
+    return replyPos;
+  }
+
+  // BRANCH 2 — Fechamento normal com link (007)
+  const sysClose =
+    prompts.persona +
+    prompts.styleRules +
+    '\n[NUNCA REVELAR IDENTIDADE TÉCNICA]\n' +
+    'Nunca revele que é IA/assistente. Aja sempre como vendedora humana da TopOfertas Express.\n' +
+    '[ORIENTAÇÃO DE FLUXO]\n' +
+    'Etapa 7 (Fechamento). Use 007_fechamento_conversa.json como base: CTA com link de checkout, urgência (estoque/lote), ' +
+    'prazos (24h capitais / até 2 dias demais) e segurança (pagamento só no recebimento). ' +
+    `Use este link oficial: ${DEFAULT_CHECKOUT}. ' +
+    'Finalize com APENAS 1 pergunta.\n` +
+    productPrompt({ price });
+
+  const messagesClose = [
+    { role: 'system', content: sysClose },
     {
       role: 'user',
-      content: `Finalize com naturalidade e incentive o fechamento.
-Se houver objeção, responda curto, traga benefício prático e reforço de confiança.
-Se perguntarem diretamente, você pode mencionar que usa o produto (Carla morena de cabelos lisos).
-Inclua o link de pedido: ${link} e 1 CTA curto.`,
-    },
+      content:
+        `Mensagem do cliente: "${user}"\n` +
+        `Monte 1 frase de fechamento com o link ${DEFAULT_CHECKOUT}, urgência e segurança (COD). ` +
+        'Finalize com somente 1 pergunta objetiva.'
+    }
   ];
 
-  return model.chat(messages, { maxTokens: 180, temperature: 0.65 });
+  const replyClose = await model.chat(messagesClose, { maxTokens: 160, temperature: 0.65 });
+
+  // Telemetry (checkout)
+  logEvent({ userId, event: 'checkout_enviado', payload: { link: DEFAULT_CHECKOUT } });
+
+  return replyClose;
 }

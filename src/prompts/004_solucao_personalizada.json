@@ -1,0 +1,44 @@
+{
+  "name": "SOLUCAO_PERSONALIZADA",
+  "version": "1.0.0",
+  "description": "Soluções/benefícios por tipo de cabelo para a Progressiva Vegetal Premium.",
+  "instructions": "Após identificar o tipo de cabelo (002_mapeamento_cabelo.json) e explorar a dor (003_dor_personalizada.json), selecione 1–2 soluções do grupo correspondente e REESCREVA no seu estilo natural (curto, empático e consultivo). Não falar de preço, logística ou COD aqui (isso está em 006_oferta_conversa.json e 010_logistica.json).",
+  "mapping_key": "tipo_cabelo",
+  "data": {
+    "liso": [
+      "Mantém os fios alinhados por até 3 meses, reduzindo a necessidade de chapinha diária.",
+      "Controla o frizz desde a primeira aplicação, com toque leve e sedoso.",
+      "Preserva o brilho mesmo quando você seca ao natural.",
+      "Entrega efeito de salão em casa, deixando a rotina mais prática.",
+      "Resultado consistente, sem pesar e sem formol."
+    ],
+    "ondulado": [
+      "Reduz o volume sem tirar o movimento natural das ondas.",
+      "Diminui o frizz e melhora a resistência à umidade ao longo do dia.",
+      "Deixa as ondas mais definidas e com brilho suave.",
+      "Facilita a finalização: responde bem tanto escovado quanto ao natural.",
+      "Permite ajustar o efeito — de mais alinhado a mais natural — conforme a aplicação."
+    ],
+    "cacheado": [
+      "Controla até 90% do frizz mantendo a definição dos cachos.",
+      "Reduz volume sem ‘apagar’ os cachos, com toque macio.",
+      "Hidrata enquanto alinha, preservando movimento e leveza.",
+      "Acelera a rotina: facilita a secagem e a finalização.",
+      "Permite alternar entre cacheado definido e escovado com mais facilidade."
+    ],
+    "crespo": [
+      "Suaviza o volume e alinha sem agredir a fibra capilar.",
+      "Trata enquanto alinha, ajudando a reduzir ressecamento e quebra.",
+      "Sem formol: seguro para couro cabeludo sensível, sem cheiro forte.",
+      "Diminui o tempo de finalização e deixa o fio mais maleável.",
+      "Entrega alinhamento com aspecto natural e saudável."
+    ],
+    "indefinido": [
+      "Adapta o resultado ao seu objetivo: de liso chapado a controle natural.",
+      "Aumenta a resistência à umidade, reduzindo frizz e arrepio.",
+      "Simplifica a rotina: menos ferramentas de calor e menos tempo.",
+      "Hidrata profundamente e realça o brilho sem deixar pesado.",
+      "Entrega aparência natural com sensação de fio saudável."
+    ]
+  }
+}
