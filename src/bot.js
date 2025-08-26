@@ -1,4 +1,4 @@
-// src/bot.js — FSM completo: objeções + intents diretas + oferta/fechamento + pós-venda
+// src/bot.js — FSM completo + captura automática de NOME
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -11,7 +11,7 @@ import { greet } from "./flows/greet.js";
 import { qualify } from "./flows/qualify.js";
 import { offer } from "./flows/offer.js";
 import { closeDeal } from "./flows/close.js";
-import { postSale } from "./flows/postsale.js"; // <-- novo: pós-venda blindado
+import { postSale } from "./flows/postsale.js";
 
 // ===== Resolve paths =====
 const __filename = fileURLToPath(import.meta.url);
@@ -114,6 +114,44 @@ function detectHairType(text = "") {
   return m ? m[0] : null;
 }
 
+// === Captura automática de NOME ===
+// Regras simples para PT-BR: "meu nome é X", "sou X", ou um nome curto (1–3 palavras, sem números/links)
+function detectNameCandidate(text = "") {
+  const t = String(text || "").trim();
+  if (!t) return null;
+
+  // Padrões explícitos
+  const m1 = t.match(/meu\s+nome\s+é\s+([A-Za-zÀ-ÿ'´`^~\-]+\s?[A-Za-zÀ-ÿ'´`^~\-]*)/i);
+  if (m1 && m1[1]) return sanitizeName(m1[1]);
+
+  const m2 = t.match(/eu\s*me\s*chamo\s+([A-Za-zÀ-ÿ'´`^~\-]+\s?[A-Za-zÀ-ÿ'´`^~\-]*)/i);
+  if (m2 && m2[1]) return sanitizeName(m2[1]);
+
+  const m3 = t.match(/^(sou|meu\s+apelido\s+é)\s+([A-Za-zÀ-ÿ'´`^~\-]+\s?[A-Za-zÀ-ÿ'´`^~\-]*)$/i);
+  if (m3 && m3[2]) return sanitizeName(m3[2]);
+
+  // Heurística: mensagem curta de 1–3 palavras, sem dígitos/URL, com inicial maiúscula
+  if (!/https?:\/\//i.test(t) && !/\d/.test(t)) {
+    const words = t.split(/\s+/).filter(Boolean);
+    if (words.length >= 1 && words.length <= 3) {
+      const looksName = words.every(w => /^[A-Za-zÀ-ÿ'´`^~\-]+$/.test(w)) && /^[A-ZÀ-Ý]/.test(words[0]);
+      if (looksName) return sanitizeName(words.map(capitalize).join(" "));
+    }
+  }
+
+  return null;
+}
+function sanitizeName(n) {
+  return String(n || "")
+    .replace(/[^A-Za-zÀ-ÿ'´`^~\-\s]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .split(" ")
+    .map(capitalize)
+    .join(" ");
+}
+function capitalize(s = "") { return s ? s[0].toUpperCase() + s.slice(1) : s; }
+
 // ===== BOT (FSM) =====
 export const bot = {
   async handleMessage({ userId = "unknown", text = "", context = {} }) {
@@ -127,13 +165,18 @@ export const bot = {
       await setMemory(userId, { ...(mem || {}), hairType: hairTypeDetected });
     }
 
+    // Captura automática de nome (se a abertura pediu nome ou ainda não temos)
+    const nameCandidate = detectNameCandidate(text);
+    if (nameCandidate && (!mem?.name || mem?.askedName)) {
+      await setMemory(userId, { ...(mem || {}), name: nameCandidate, askedName: false, updatedAt: Date.now() });
+    }
+
     let reply = "";
 
     try {
       // 0) Mídia
       if (context?.hasMedia || textIndicaMidia(text)) {
         reply = respostaMidia();
-        // não altera estado
         await setMemory(userId, { state, lastUserText: text, welcomed: jaEnviouFotoAbertura, updatedAt: Date.now() });
         return reply;
       }
@@ -172,7 +215,8 @@ export const bot = {
       else if (state === STATES.QUALIFY) {
         // Se já detectou tipo de cabelo, avança e pergunta de dor diretamente
         if (hairTypeDetected || /liso|ondulad|cachead|cresp/i.test(text)) {
-          reply = "Entendi 💕. Me conta: qual a maior dificuldade que ele te dá? Frizz, volume, alinhamento?";
+          const nome = (mem?.name || nameCandidate) ? `${mem?.name || nameCandidate}, ` : "";
+          reply = `${nome}me conta: qual a maior dificuldade que ele te dá? Frizz, volume ou alinhamento?`;
           state = STATES.DOR;
         } else {
           // Ainda não temos tipo — usa flow pra perguntar uma única vez
@@ -181,22 +225,18 @@ export const bot = {
         }
       }
       else if (state === STATES.DOR) {
-        // Após explorar dor, vamos para oferta
         reply = await offer({ text, context, prompts, productPrompt, price: PRICE_TARGET });
         state = STATES.OFFER;
       }
       else if (state === STATES.OFFER) {
-        // Reforça a oferta (sem link) e prepara para fechamento
         reply = await offer({ text, context, prompts, productPrompt, price: PRICE_TARGET });
         state = STATES.CLOSE;
       }
       else if (state === STATES.CLOSE) {
-        // Fechamento com link; permanece no CLOSE até aparecer comprovante
         reply = await closeDeal({ text, context, prompts, productPrompt, price: PRICE_TARGET });
-        state = STATES.CLOSE;
+        state = STATES.CLOSE; // fica em CLOSE até detectar comprovante
       }
       else if (state === STATES.POS) {
-        // Se já está em pós, mantém conversando pelo postsale
         reply = await postSale({ text, context: { ...(context||{}), userId }, prompts, productPrompt, price: PRICE_TARGET });
         state = STATES.POS;
       }
@@ -213,6 +253,7 @@ export const bot = {
 
     // 6) Persistência
     await setMemory(userId, {
+      ...(await getMemory(userId)), // garante merge
       state,
       lastUserText: text,
       welcomed: true,

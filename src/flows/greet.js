@@ -1,37 +1,52 @@
-// src/flows/greet.js
+// src/flows/greet.js — revisado: abertura calorosa + pedir nome
 import { model } from '../model.js';
 import { logEvent } from '../telemetry.js';
+import { setMemory } from '../memory.js';
 
-export async function greet({ text, context, prompts, productPrompt }) {
+// Garante no máximo 1 pergunta
+function oneQuestionOnly(answer = '') {
+  const s = String(answer || '');
+  const parts = s.split('?');
+  if (parts.length <= 2) return s.trim();
+  return (parts.slice(0, 2).join('?') + (s.endsWith('?') ? '?' : '')).trim();
+}
+
+export async function greet({ text, context, prompts, productPrompt, price = 170 }) {
+  const userId = (context && context.userId) || 'unknown';
   const sys =
     prompts.persona +
     prompts.styleRules +
-    // reforço explícito de identidade humana
     '\n[NUNCA REVELAR IDENTIDADE TÉCNICA]\n' +
-    'Nunca revele que é IA/assistente. Apresente-se e aja sempre como vendedora humana da TopOfertas Express.\n' +
-    productPrompt({ price: process.env.PRICE_TARGET || 170 });
+    'Você é vendedora humana da TopOfertas Express.\n' +
+    '[ETAPA 1 — ABERTURA]\n' +
+    '- Responda em 2 frases curtas.\n' +
+    '- Seja calorosa, empática e use emojis suaves.\n' +
+    '- Apresente o produto de forma sutil.\n' +
+    '- Peça o NOME do cliente de forma natural (ex.: “E o seu nome, qual é? 💕”).\n' +
+    '- Finalize sempre com 1 pergunta curta.\n' +
+    productPrompt({ price });
 
-  const user = (text || 'Oi').trim();
+  const userMsg =
+    `Mensagem do cliente: "${(text || '').trim()}"\n` +
+    'Monte uma resposta de abertura em 2 frases + 1 pergunta, pedindo o nome do cliente.';
 
   const messages = [
     { role: 'system', content: sys },
-    {
-      role: 'user',
-      content: `${user}
-
-Contexto: lead vindo de anúncio/landing. Faça uma saudação curta, passe segurança e finalize com 1 pergunta objetiva.`,
-    },
+    { role: 'user', content: userMsg }
   ];
 
-  // gera a saudação
-  const reply = await model.chat(messages, { maxTokens: 120, temperature: 0.7 });
+  let reply = await model.chat(messages, { maxTokens: 160, temperature: 0.6 });
+  reply = oneQuestionOnly(String(reply || '').trim());
 
-  // telemetry: marca que a abertura foi enviada
-  logEvent({
-    userId: (context && context.userId) || 'unknown',
-    event: 'abertura_enviada',
-    payload: { preview: String(reply).slice(0, 120) }
-  });
+  if (!reply || reply.length < 20) {
+    reply = "Oi! Seja muito bem-vinda 💕 Eu sou a Carla da TopOfertas Express. Qual é o seu nome?";
+  }
+
+  // 🔐 Salva flag de que já pediu o nome (pra personalizar depois)
+  await setMemory(userId, { askedName: true, updatedAt: Date.now() });
+
+  // 📊 Telemetry
+  logEvent({ userId, event: 'abertura_enviada', payload: { preview: reply.slice(0, 120) } });
 
   return reply;
 }
