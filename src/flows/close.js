@@ -16,13 +16,16 @@ function oneQuestionOnly(answer = '') {
   if (parts.length <= 2) return s.trim();
   return (parts.slice(0, 2).join('?') + (s.endsWith('?') ? '?' : '')).trim();
 }
+
 function detectComprovante(text = '') {
   return /(paguei|pago|comprovante|print|enviei.*comprovante|mandei.*comprovante)/i.test((text||'').toLowerCase());
 }
+
 // 👇 Intenção de compra (só nesses casos pode mandar link)
 function shouldOfferLink(text = '') {
   return /(comprar|adquirir|checkout|link|finalizar|fechar pedido|onde pago)/i.test((text||'').toLowerCase());
 }
+
 // 👇 Perguntas de fidelidade
 function isFidelidade(text = '') {
   return /(fidelidade|recompra|segunda compra|desconto futuro|cupom)/i.test((text||'').toLowerCase());
@@ -67,12 +70,12 @@ export async function closeDeal({ text, context, prompts, productPrompt, price =
     return `Na sua recompra você ganha um cupom de R$150 💕 (código: ${COUPON_CODE}), válido por 3 meses.`;
   }
 
-  // Fechamento normal
+  // Fechamento normal — perguntas informativas sem link
   if (!shouldOfferLink(user)) {
-    // Pergunta informativa → responde sem link
     return "Pode ficar tranquila 💕 O pagamento é só na entrega (COD) e a entrega leva até 24h em capitais ou 2 dias em outras cidades.";
   }
 
+  // Fechamento com intenção de compra — envia link
   const sys =
     prompts.persona + prompts.styleRules +
     '\n[NUNCA REVELAR IDENTIDADE TÉCNICA]\n' +

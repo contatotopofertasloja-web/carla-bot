@@ -22,26 +22,27 @@ export async function greet({ text, context, prompts, productPrompt, price = 170
     '[ETAPA 1 — ABERTURA]\n' +
     '- Responda em até 2 frases curtas.\n' +
     '- Seja calorosa, empática e use emojis suaves.\n' +
-    '- Apresente o produto de forma sutil, sem parecer forçado.\n' +
+    '- Apresente o produto de forma natural, mostrando experiência própria (“eu uso e amo o resultado”).\n' +
+    '- Sempre valide a emoção do cliente (ex.: “eu também tinha esse receio antes de testar”).\n' +
     '- Peça o NOME do cliente de forma natural (ex.: “E o seu nome, qual é? 💕”).\n' +
     '- Termine sempre com apenas 1 pergunta.\n' +
     productPrompt({ price });
 
   const userMsg =
     `Mensagem do cliente: "${(text || '').trim()}"\n` +
-    'Monte a resposta de abertura em 2 frases + 1 pergunta, pedindo o nome do cliente.';
+    'Monte a resposta de abertura em 2 frases + 1 pergunta, pedindo o nome do cliente com empatia.';
 
   const messages = [
     { role: 'system', content: sys },
     { role: 'user', content: userMsg }
   ];
 
-  let reply = await model.chat(messages, { maxTokens: 160, temperature: 0.6 });
+  let reply = await model.chat(messages, { maxTokens: 180, temperature: 0.7 });
   reply = oneQuestionOnly(String(reply || '').trim());
 
   // 🚑 Fallback se vier vazio ou curto
   if (!reply || reply.length < 20) {
-    reply = "Oi! Seja muito bem-vinda 💕 Eu sou a Carla da TopOfertas Express. Qual é o seu nome?";
+    reply = "Oi! Seja muito bem-vinda 💕 Eu sou a Carla da TopOfertas Express, uso essa progressiva e amo o resultado. Qual é o seu nome? 💇‍♀️";
   }
 
   // 🔐 Marca que já pediu o nome (pra personalizar nas próximas etapas)

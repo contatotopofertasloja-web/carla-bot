@@ -1,0 +1,85 @@
+Top, parça 🚀 Bora fechar a Carla versão FSM blindada.
+Aqui está o pacote final resumido com todos os arquivos revisados que você já tem prontos para colar no projeto:
+
+---
+
+ 📦 Carla — FSM 100% Blindada
+
+ 1. `src/bot.js`
+
+ Orquestra o FSM (Greet → Qualify → Dor → Offer → Close → PostSale).
+ Captura automática de nome e tipo de cabelo.
+ Trata objeções leves/vagas (“não sei, será que funciona”) como `nao_confio`.
+ Responde pelo nome se cliente perguntar “lembra do meu nome?”.
+ Só manda link se lead demonstrar intenção de compra.
+ Pós-venda acionado com “paguei/comprovante”.
+
+---
+
+ 2. `src/flows/greet.js`
+
+ Abertura curta e calorosa.
+ Pede o nome de forma natural e guarda em `memory`.
+ Sempre em até 2 frases + 1 pergunta.
+ Telemetry → `abertura_enviada`.
+
+---
+
+ 3. `src/flows/qualify.js`
+
+ Pergunta o tipo de cabelo uma única vez.
+ Se já tiver → pula para dor direto.
+ Evita loops e repetições.
+ Telemetry → `mapeamento_pergunta_enviada` ou `dor_pergunta_enviada`.
+
+---
+
+ 4. `src/flows/offer.js`
+
+ Oferta sempre com:
+
+   Preço R\$197 → R\$170.
+   Benefício por tipo de cabelo.
+   COD (pagamento só na entrega).
+   Prazo (24h capitais, 2 dias demais).
+   Urgência (estoque limitado).
+ Sempre 2 frases + 1 pergunta.
+ 🚫 Nunca manda link.
+ Se lead soltar dúvida vaga → responde como objeção leve.
+ Telemetry → `oferta_mostrada`.
+
+---
+
+ 5. `src/flows/close.js`
+
+ Só manda link se detectar intenção de compra (comprar, adquirir, checkout, fechar pedido).
+ Perguntas informativas (pagamento, entrega) → responde sem link.
+ Fidelidade/recompra → apenas informa cupom, sem empurrar link.
+ Pós-venda (comprovante) → confirma, agradece, libera cupom.
+ Telemetry → `checkout_enviado`, `pos_pagamento_enviado`, `cupom_liberado`.
+
+---
+
+ 6. `src/flows/postsale.js`
+
+ Blindado contra link.
+ Sempre: confirma print + agradece + libera cupom (R\$150).
+ Finaliza com 1 pergunta leve.
+ Telemetry → `pos_pagamento_enviado` + `cupom_liberado`.
+
+---
+
+ 🔧 Vantagens da versão final
+
+ ❌ Sem loops (não repete tipo de cabelo).
+ ❌ Sem ofertas preguiçosas → só curtas e persuasivas.
+ ❌ Sem link fora de hora.
+ ✅ Respeita objeções, inclusive as “vagas”.
+ ✅ Personalização com nome.
+ ✅ Pós-venda profissional (cupom fidelidade garantido).
+ ✅ Telemetry mapeando funil inteiro (abertura → dor → oferta → checkout → pós).
+
+---
+
+👉 Parça, agora a Carla tá pronta pra guerra.
+Quer que eu monte um README.md simples com instruções de deploy e fluxo (pra você ou qualquer pessoa subir sem depender da memória do chat)?

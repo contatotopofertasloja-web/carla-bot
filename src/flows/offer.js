@@ -1,7 +1,7 @@
-// src/flows/offer.js — revisado: 2 frases + 1 pergunta, sem link, objeções vagas tratadas
+// src/flows/offer.js — FSM blindada: oferta curta, persuasiva e sem link
 import { model } from '../model.js';
 import { logEvent } from '../telemetry.js';
-import { getMemory, setMemory } from '../memory.js';
+import { getMemory } from '../memory.js';
 
 // Configs
 const PRICE_ORIGINAL = Number(process.env.PRICE_ORIGINAL || 197);
@@ -16,14 +16,14 @@ function oneQuestionOnly(answer = '') {
 
 function benefitByHairType(hairType) {
   const t = (hairType || '').toLowerCase();
-  if (t.includes('liso'))      return 'liso alinhado sem chapinha diária';
-  if (t.includes('ondulado'))  return 'ondas definidas e menos frizz';
-  if (t.includes('cacheado'))  return 'cachos definidos e redução de volume';
-  if (t.includes('crespo'))    return 'volume reduzido com fios hidratados';
+  if (t.includes('liso'))      return 'liso alinhado sem precisar chapinha todo dia';
+  if (t.includes('ondulad'))   return 'ondas definidas com menos frizz';
+  if (t.includes('cachead'))   return 'cachos definidos, hidratados e com menos volume';
+  if (t.includes('crespo'))    return 'redução de volume e fios macios';
   return 'cabelo alinhado, macio e com brilho de salão';
 }
 
-// Detecta se o texto é uma dúvida vaga/insegurança → tratamos como objeção leve
+// Detecta dúvida vaga/insegurança
 function isDuvidaVaga(text = '') {
   return /(não sei|nao sei|será que|sera que|tenho dúvida|tenho duvida)/i.test((text || '').toLowerCase());
 }
@@ -35,14 +35,16 @@ export async function offer({ text, context, prompts, productPrompt, price = PRI
   const nome     = memory?.name || '';
 
   const precoLinha = `de R$ ${PRICE_ORIGINAL} por R$ ${PRICE_PROMO}`;
-  const prazoLinha = 'Entrega em até 24h (capitais) ou até 2 dias (demais cidades).';
-  const codLinha   = 'Pagamento só no recebimento (COD).';
-  const urgencia   = 'Estoque promocional limitado.';
+  const prazoLinha = 'Entrega rápida: até 24h (capitais) ou 2 dias úteis (demais cidades).';
+  const codLinha   = 'Pagamento só quando receber em mãos (COD).';
+  const urgencia   = 'Promoção válida enquanto durar o estoque.';
 
-  // Se for dúvida vaga → responde como objeção leve (sem seguir funil)
+  // Caso seja dúvida vaga → responde com acolhimento
   if (isDuvidaVaga(text)) {
-    const resposta = `${nome ? nome + ', ' : ''}fica tranquila 💕 Você só paga quando receber (COD), sem risco nenhum. ` +
-                     `O tratamento é seguro, sem formol, e ${precoLinha}. Quer que eu te mostre mais depoimentos de clientes?`;
+    const resposta =
+      `${nome ? nome + ', ' : ''}eu entendo sua dúvida 💕 Pode ficar tranquila: ` +
+      `o tratamento é seguro, sem formol, e você só paga quando receber (${codLinha}). ` +
+      `Hoje ele está ${precoLinha}. Quer que eu te mostre depoimentos reais de clientes?`;
     logEvent({ userId, event: 'objection_tratada', payload: { tipo: 'nao_confio', preview: resposta.slice(0, 120) } });
     return resposta;
   }
@@ -73,12 +75,12 @@ export async function offer({ text, context, prompts, productPrompt, price = PRI
   let reply = await model.chat(messages, { maxTokens: 180, temperature: 0.55 });
   reply = String(reply || '').trim();
 
-  // Fallback se vier ruim ou contiver link
-  if (!reply || reply.length < 20 || reply.split('.').length > 3 || /https?:\/\//i.test(reply)) {
+  // Fallback caso venha ruim ou com link
+  if (!reply || reply.length < 20 || /https?:\/\//i.test(reply)) {
     reply =
       `${nome ? nome + ', ' : ''}olha só: ${precoLinha}, ` +
       `com ${benefitByHairType(hairType)}. ${codLinha} ${prazoLinha} ${urgencia} ` +
-      'Quer garantir pelo preço promocional?';
+      'Quer garantir o seu pelo valor promocional?';
   }
 
   reply = oneQuestionOnly(reply);
