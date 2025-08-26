@@ -1,165 +1,92 @@
-// src/bot.js — versão com detecção de objeções e fallback seguro (ESM)
+// src/bot.js — FSM completo + captura automática de NOME
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 
 import { getMemory, setMemory } from "./memory.js";
-import prompts from "./prompts/base.js";              // adapter (default export)
+import prompts from "./prompts/base.js";
 import { productPrompt } from "./prompts/product.js";
+
 import { greet } from "./flows/greet.js";
 import { qualify } from "./flows/qualify.js";
 import { offer } from "./flows/offer.js";
 import { closeDeal } from "./flows/close.js";
+import { postSale } from "./flows/postsale.js";
 
-// ===== Resolve paths (para ler JSON local mesmo em ESM) =====
+// ===== Resolve paths =====
 const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const __dirname  = path.dirname(__filename);
 const OBJECTIONS_PATH = path.join(__dirname, "prompts", "objections.json"); // opcional
 
 // ===== Configs =====
 const PRICE_TARGET = Number(process.env.PRICE_TARGET || 170);
 
-// JSON carregado pelo adapter (pode ser null se estiver em fallback JS)
-const CFG = prompts.__carla_json || null;
-
-// Atalhos tolerantes para dados do produto/regras
-const PRODUCT = CFG?.product || {};
-const PRICE = PRODUCT?.price || {};
-const RULES = CFG?.rules || {};
-const MEDIA = RULES?.media || null;
+// ===== Estados do funil =====
+const STATES = {
+  GREET:  "greet",   // abertura
+  QUALIFY:"qualify", // mapeamento do cabelo
+  DOR:    "dor",     // exploração da dor
+  OFFER:  "offer",   // apresentação de oferta
+  CLOSE:  "close",   // fechamento com link
+  POS:    "pos"      // pós-venda (comprovante/cupom)
+};
 
 // ===== Helpers =====
-function pick(arr = []) {
-  return arr[Math.floor(Math.random() * arr.length)];
-}
+function pick(arr = []) { return arr[Math.floor(Math.random() * arr.length)]; }
 
 function textIndicaMidia(text = "") {
-  // Heurística: usuário dizendo que mandou mídia
-  const re =
-    /(te?\s*(mandei|enviei)|segue|acabei de\s*(mandar|enviar)).*(foto|imagem|áudio|audio|vídeo|video|documento|arquivo)/i;
-  return re.test(text);
+  return /(foto|imagem|áudio|audio|vídeo|video|documento|arquivo)/i.test(text);
 }
-
 function respostaMidia() {
-  // Variantes padrão para quando o usuário manda mídia (e a “central não abre”)
-  const variantsFromRules =
-    typeof MEDIA === "string" ? [MEDIA] : MEDIA?.variants || null;
-
-  const variants =
-    variantsFromRules ||
-    [
-      "Amiga, minha central não abre áudio/foto 😅 me conta rapidinho por texto? Assim já te ajudo agora!",
-      "Consigo te ajudar mais rápido por texto 💕 me resume aqui o que apareceu?"
-    ];
-  return pick(variants);
+  return pick([
+    "Amiga, minha central não abre áudio/foto 😅 me conta rapidinho por texto? Assim já te ajudo agora!",
+    "Consigo te ajudar mais rápido por texto 💕 me resume aqui o que apareceu?"
+  ]);
 }
 
-// Intent direta (resposta seca, sem puxar assunto)
+// Intenções diretas (perguntas secas)
 function detectDirectIntent(text = "") {
   const t = text.toLowerCase();
   if (/(quantos?\s*ml|ml|quantidade)/i.test(t)) return "ml";
-  if (/(sem\s*formol|formol)/i.test(t)) return "formol";
-  if (/(quanto\s*custa|preço|valor)/i.test(t)) return "price";
+  if (/(sem\s*formol|formol)/i.test(t))         return "formol";
+  if (/(quanto\s*custa|preço|valor)/i.test(t))  return "price";
   if (/(link|checkout|quero\s*comprar|onde\s*pago)/i.test(t)) return "checkout";
   if (/(foto|imagem|mostra|manda a foto)/i.test(t)) return "photo";
   return null;
 }
-
-function enforceSingleQuestion(answer = "") {
-  const parts = answer.split("?");
-  if (parts.length <= 2) return answer; // 0 ou 1 '?'
-  return parts.slice(0, 2).join("?").trim(); // mantém só a 1ª pergunta
-}
-
 function directAnswer(intent) {
   if (!intent) return null;
-
-  const vol = PRODUCT?.volume_ml ? `${PRODUCT.volume_ml}ml` : "500ml";
-  const dur = PRODUCT?.duration_hint || "dura até 3 meses";
-  const priceLabel = PRICE?.label || "R$170 com frete grátis";
-  const checkoutUrl =
-    PRICE?.checkout_url ||
-    "https://entrega.logzz.com.br/pay/memmpxgmg/progcreme170";
-
-  if (intent === "ml") return `${vol}, ${dur} 😉`;
-  if (intent === "formol") return "Sim 🌿 fórmula vegetal, sem formol.";
-  if (intent === "price") return `Hoje está por ${priceLabel} ✨`;
-  if (intent === "checkout")
-    return `Perfeito 🎉 aqui está o link oficial do checkout: ${checkoutUrl}`;
-  if (intent === "photo")
-    return `[ENVIAR_FOTO_PRODUTO:Essa é a Progressiva Vegetal Profissional 🌿 sem formol e com brilho de salão ✨]`;
+  if (intent === "ml")      return "500ml, dura até 3 meses 😉";
+  if (intent === "formol")  return "Zero formol 🌿 seguro e natural.";
+  if (intent === "price")   return "De R$197 por R$170 ✨ pagamento só na entrega (COD).";
+  if (intent === "checkout")return "Perfeito 🎉 aqui está o link oficial: https://entrega.logzz.com.br/pay/memmpxgmg/progcreme170";
+  if (intent === "photo")   return "[ENVIAR_FOTO_PRODUTO:Essa é a Progressiva Vegetal 🌿 sem formol e com brilho de salão ✨]";
   return null;
 }
 
-// Foto de abertura
-function legendaFotoAbertura() {
-  return pick([
-    "Essa é a Progressiva Vegetal Profissional 🌿 sem formol e com brilho de salão ✨",
-    "Olha a Progressiva Vegetal Profissional 🌿 quer que eu te explique rapidinho como funciona?"
-  ]);
-}
-function comandoFotoAbertura() {
-  const legenda = legendaFotoAbertura();
-  return `[ENVIAR_FOTO_PRODUTO:${legenda}]`;
-}
-
-// ===== Objeções (detecção + respostas com fallback) =====
+// Objeções — load opcional de arquivo + fallback
 const DEFAULT_OBJECTIONS = {
   caro: [
-    "Entendo totalmente! Mas pense que o tratamento dura até 3 meses, sai menos de R$2 por dia para manter o cabelo alinhado.",
-    "Muita gente pensa no valor imediato, mas quando compara com salão, percebe que economiza bastante.",
-    "Se colocar na ponta do lápis, você gasta mais em chapinha, produtos e tempo do que investindo nesse tratamento.",
-    "E o melhor: você só paga quando receber, no pagamento na entrega, sem risco pra você.",
-    "A vantagem é que você resolve de uma vez e não precisa se preocupar nos próximos meses."
+    "Entendo! Mas dura até 3 meses — sai menos de R$2/dia ✨",
+    "Você só paga quando receber (COD), sem risco 😉"
   ],
   medo_estragar: [
-    "Essa preocupação é super válida! Mas a Progressiva Vegetal é sem formol, totalmente segura para os fios.",
-    "Diferente das químicas fortes, ela hidrata enquanto alinha, então o cabelo sai mais macio e saudável.",
-    "O objetivo dela não é agredir, mas tratar e alinhar ao mesmo tempo.",
-    "Muitas clientes que tiveram experiências ruins com outras progressivas se surpreendem com a leveza dessa.",
-    "Pode ficar tranquila: não tem cheiro forte, não arde e não resseca o cabelo."
-  ],
-  nao_funcionou: [
-    "Eu entendo sua frustração! A diferença dessa é que ela tem efeito real já na primeira aplicação.",
-    "Outras progressivas usam química agressiva que só mascara o fio. Essa atua de forma natural e duradoura.",
-    "Temos clientes que já tentaram várias e só aqui encontraram resultado de verdade.",
-    "O efeito é comprovado e dura até 3 meses sem precisar de retoque constante.",
-    "Você só precisa aplicar uma vez e já percebe o cabelo alinhado e sem frizz."
-  ],
-  tem_formol: [
-    "Pode ficar tranquila: é 100% sem formol.",
-    "Esse é justamente o diferencial: resultado profissional sem química agressiva.",
-    "Não causa ardência, não tem cheiro forte e é seguro até para couro cabeludo sensível.",
-    "Além de alinhar, hidrata e fortalece os fios.",
-    "É por isso que chamamos de Premium: liso, natural e saudável."
-  ],
-  sem_tempo: [
-    "A aplicação é super prática e rápida, sem precisar de salão.",
-    "Depois de aplicar, você economiza horas toda semana sem precisar de chapinha.",
-    "É só aplicar e pronto: você esquece a luta com o frizz por até 3 meses.",
-    "O tempo que você investe uma vez compensa muito na rotina depois.",
-    "Imagine acordar já com o cabelo alinhado, sem perder tempo arrumando."
+    "Essa é sem formol 🌿 trata enquanto alinha — segura pro fio.",
+    "Pode ficar tranquila: não resseca e não tem cheiro forte."
   ],
   nao_confio: [
-    "É normal ter essa dúvida, mas aqui você tem o pagamento na entrega: só paga quando receber.",
-    "Você não precisa colocar cartão ou pagar antes, só recebe e aí sim paga.",
-    "Isso garante que você não corre nenhum risco.",
-    "Muita gente compra pela primeira vez assim e depois repete porque se sente segura.",
-    "Além disso, você recebe o produto original, lacrado e com garantia."
+    "Pagamento só na entrega 🚚💵 sem risco nenhum.",
+    "Você recebe o produto primeiro e só então paga, combinado?"
   ]
 };
-
 function loadObjections() {
   try {
     if (fs.existsSync(OBJECTIONS_PATH)) {
-      const raw = fs.readFileSync(OBJECTIONS_PATH, "utf-8");
+      const raw  = fs.readFileSync(OBJECTIONS_PATH, "utf-8");
       const json = JSON.parse(raw);
-      // espera-se um shape { data: { caro: [...], medo_estragar: [...] } }
       return json.data || DEFAULT_OBJECTIONS;
     }
-  } catch (e) {
-    console.warn("[BOT] Falha ao ler objections.json, usando defaults:", e);
-  }
+  } catch { /* ignore e usa default */ }
   return DEFAULT_OBJECTIONS;
 }
 const OBJECTIONS = loadObjections();
@@ -168,124 +95,171 @@ function detectObjection(text = "") {
   const t = text.toLowerCase();
   if (/car[oa]|caríssimo|muito caro/.test(t)) return "caro";
   if (/medo|estragar|danificar|quebrar/.test(t)) return "medo_estragar";
-  if (/(não|nao)\s*(funcionou|deu certo)/.test(t)) return "nao_funcionou";
-  if (/formol/.test(t)) return "tem_formol";
-  if (/tempo|sem tempo|correria|demorado/.test(t)) return "sem_tempo";
-  if (/(não|nao)\s*confio|desconfiad[ao]/.test(t)) return "nao_confio";
+  if (/(não|nao)\s*confio|golpe|desconfiad[ao]/.test(t)) return "nao_confio";
   return null;
 }
 function answerObjection(kind) {
-  const arr = OBJECTIONS?.[kind] || [];
-  return arr.length ? pick(arr) : null;
+  return pick(OBJECTIONS[kind] || []);
 }
 
-// ===== BOT =====
+// Comprovante → pós-venda
+function detectComprovante(text = "") {
+  const t = (text || "").toLowerCase();
+  return /(paguei|pago|comprovante|print|enviei.*comprovante|mandei.*comprovante|enviei.*print|mandei.*print)/i.test(t);
+}
+
+// Detecta tipo de cabelo (para memória curta)
+function detectHairType(text = "") {
+  const m = String(text || "").toLowerCase().match(/liso|ondulad[oa]?|cachead[oa]?|cresp[oa]?/i);
+  return m ? m[0] : null;
+}
+
+// === Captura automática de NOME ===
+// Regras simples para PT-BR: "meu nome é X", "sou X", ou um nome curto (1–3 palavras, sem números/links)
+function detectNameCandidate(text = "") {
+  const t = String(text || "").trim();
+  if (!t) return null;
+
+  // Padrões explícitos
+  const m1 = t.match(/meu\s+nome\s+é\s+([A-Za-zÀ-ÿ'´`^~\-]+\s?[A-Za-zÀ-ÿ'´`^~\-]*)/i);
+  if (m1 && m1[1]) return sanitizeName(m1[1]);
+
+  const m2 = t.match(/eu\s*me\s*chamo\s+([A-Za-zÀ-ÿ'´`^~\-]+\s?[A-Za-zÀ-ÿ'´`^~\-]*)/i);
+  if (m2 && m2[1]) return sanitizeName(m2[1]);
+
+  const m3 = t.match(/^(sou|meu\s+apelido\s+é)\s+([A-Za-zÀ-ÿ'´`^~\-]+\s?[A-Za-zÀ-ÿ'´`^~\-]*)$/i);
+  if (m3 && m3[2]) return sanitizeName(m3[2]);
+
+  // Heurística: mensagem curta de 1–3 palavras, sem dígitos/URL, com inicial maiúscula
+  if (!/https?:\/\//i.test(t) && !/\d/.test(t)) {
+    const words = t.split(/\s+/).filter(Boolean);
+    if (words.length >= 1 && words.length <= 3) {
+      const looksName = words.every(w => /^[A-Za-zÀ-ÿ'´`^~\-]+$/.test(w)) && /^[A-ZÀ-Ý]/.test(words[0]);
+      if (looksName) return sanitizeName(words.map(capitalize).join(" "));
+    }
+  }
+
+  return null;
+}
+function sanitizeName(n) {
+  return String(n || "")
+    .replace(/[^A-Za-zÀ-ÿ'´`^~\-\s]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .split(" ")
+    .map(capitalize)
+    .join(" ");
+}
+function capitalize(s = "") { return s ? s[0].toUpperCase() + s.slice(1) : s; }
+
+// ===== BOT (FSM) =====
 export const bot = {
   async handleMessage({ userId = "unknown", text = "", context = {} }) {
     const mem = await getMemory(userId);
-    const step = mem?.step || "greet";
+    let state = mem?.state || STATES.GREET;
     const jaEnviouFotoAbertura = Boolean(mem?.welcomed);
 
+    // Persistir hairType rapidamente se aparecer
+    const hairTypeDetected = detectHairType(text);
+    if (hairTypeDetected) {
+      await setMemory(userId, { ...(mem || {}), hairType: hairTypeDetected });
+    }
+
+    // Captura automática de nome (se a abertura pediu nome ou ainda não temos)
+    const nameCandidate = detectNameCandidate(text);
+    if (nameCandidate && (!mem?.name || mem?.askedName)) {
+      await setMemory(userId, { ...(mem || {}), name: nameCandidate, askedName: false, updatedAt: Date.now() });
+    }
+
     let reply = "";
-    let newStep = step;
 
     try {
-      // 0) Política de mídia
+      // 0) Mídia
       if (context?.hasMedia || textIndicaMidia(text)) {
         reply = respostaMidia();
-        await setMemory(userId, {
-          step,
-          lastUserText: text,
-          welcomed: jaEnviouFotoAbertura,
-          updatedAt: Date.now()
-        });
+        await setMemory(userId, { state, lastUserText: text, welcomed: jaEnviouFotoAbertura, updatedAt: Date.now() });
         return reply;
       }
 
-      // 1) Intent direta (resposta seca/objetiva)
+      // 1) Intenções diretas (respostas secas)
       const intent = detectDirectIntent(text);
       const direct = directAnswer(intent);
       if (direct) {
-        let prefixoFoto = "";
-        if (!jaEnviouFotoAbertura) prefixoFoto = comandoFotoAbertura() + "\n";
-        const out = `${prefixoFoto}${direct}`.trim();
-
-        await setMemory(userId, {
-          step,
-          lastUserText: text,
-          welcomed: true,
-          updatedAt: Date.now()
-        });
+        const prefix = !jaEnviouFotoAbertura ? "[ENVIAR_FOTO_PRODUTO:Essa é a Progressiva Vegetal 🌿 ✨]\n" : "";
+        const out = (prefix + direct).trim();
+        await setMemory(userId, { state, lastUserText: text, welcomed: true, updatedAt: Date.now() });
         return out;
       }
 
-      // 2) Objeções (ANTES do fluxo principal)
+      // 2) Objeções (tratadas antes de avançar no funil)
       const obj = detectObjection(text);
       if (obj) {
-        const respostaObj = answerObjection(obj);
-        if (respostaObj) {
-          // Não avança etapa: trata a objeção e mantém step atual
-          await setMemory(userId, {
-            step,
-            lastUserText: text,
-            welcomed: jaEnviouFotoAbertura,
-            updatedAt: Date.now()
-          });
-          return respostaObj;
+        const ans = answerObjection(obj);
+        await setMemory(userId, { state, lastUserText: text, welcomed: jaEnviouFotoAbertura, updatedAt: Date.now() });
+        return ans;
+      }
+
+      // 3) Comprovante → vai direto para pós-venda (POS)
+      if (detectComprovante(text)) {
+        reply = await postSale({ text, context: { ...(context||{}), userId }, prompts, productPrompt, price: PRICE_TARGET });
+        state = STATES.POS;
+        await setMemory(userId, { state, lastUserText: text, welcomed: true, updatedAt: Date.now() });
+        return reply;
+      }
+
+      // 4) FSM: fluxo por estado
+      if (state === STATES.GREET) {
+        reply = await greet({ text, context, prompts, productPrompt });
+        state = STATES.QUALIFY;
+      }
+      else if (state === STATES.QUALIFY) {
+        // Se já detectou tipo de cabelo, avança e pergunta de dor diretamente
+        if (hairTypeDetected || /liso|ondulad|cachead|cresp/i.test(text)) {
+          const nome = (mem?.name || nameCandidate) ? `${mem?.name || nameCandidate}, ` : "";
+          reply = `${nome}me conta: qual a maior dificuldade que ele te dá? Frizz, volume ou alinhamento?`;
+          state = STATES.DOR;
+        } else {
+          // Ainda não temos tipo — usa flow pra perguntar uma única vez
+          reply = await qualify({ text, context, prompts, productPrompt });
+          state = STATES.QUALIFY;
         }
       }
-
-      // 3) Fluxo principal por etapas
-      if (step === "greet") {
-        reply = await greet({ text, context, prompts, productPrompt });
-        newStep = "qualify";
-      } else if (step === "qualify") {
-        reply = await qualify({ text, context, prompts, productPrompt });
-        // avança só se detectar intenção mínima
-        newStep = /sim|quero|interessad|como funciona|tem entrega/i.test(text)
-          ? "offer"
-          : "qualify";
-      } else if (step === "offer") {
-        reply = await offer({
-          text,
-          context,
-          prompts,
-          productPrompt,
-          price: PRICE_TARGET
-        });
-        newStep = "close";
-      } else {
-        reply = await closeDeal({
-          text,
-          context,
-          prompts,
-          productPrompt,
-          price: PRICE_TARGET
-        });
-        newStep = "close";
-        reply = enforceSingleQuestion(reply);
+      else if (state === STATES.DOR) {
+        reply = await offer({ text, context, prompts, productPrompt, price: PRICE_TARGET });
+        state = STATES.OFFER;
+      }
+      else if (state === STATES.OFFER) {
+        reply = await offer({ text, context, prompts, productPrompt, price: PRICE_TARGET });
+        state = STATES.CLOSE;
+      }
+      else if (state === STATES.CLOSE) {
+        reply = await closeDeal({ text, context, prompts, productPrompt, price: PRICE_TARGET });
+        state = STATES.CLOSE; // fica em CLOSE até detectar comprovante
+      }
+      else if (state === STATES.POS) {
+        reply = await postSale({ text, context: { ...(context||{}), userId }, prompts, productPrompt, price: PRICE_TARGET });
+        state = STATES.POS;
       }
 
-      // 4) Foto automática na 1ª resposta
-      let prefixoFoto = "";
-      if (!jaEnviouFotoAbertura) {
-        prefixoFoto = comandoFotoAbertura() + "\n";
+      // 5) Foto automática na primeira resposta
+      if (!jaEnviouFotoAbertura && state !== STATES.GREET) {
+        reply = "[ENVIAR_FOTO_PRODUTO:Essa é a Progressiva Vegetal 🌿 ✨]\n" + String(reply || "");
       }
-      reply = `${prefixoFoto}${reply}`.trim();
+
     } catch (err) {
       console.error("[BOT][ERR]", err);
-      reply =
-        "Dei uma travadinha aqui. Quer que eu te passe o passo a passo rapidinho?";
+      reply = "Dei uma travadinha aqui, pode repetir? 💕";
     }
 
-    // 5) Persistência de memória
+    // 6) Persistência
     await setMemory(userId, {
-      step: newStep,
+      ...(await getMemory(userId)), // garante merge
+      state,
       lastUserText: text,
       welcomed: true,
       updatedAt: Date.now()
     });
 
-    return reply;
+    return String(reply || "").trim();
   }
 };

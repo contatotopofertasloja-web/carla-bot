@@ -1,4 +1,4 @@
-// src/flows/offer.js — revisado: 2 frases + 1 pergunta, com fallback rígido
+// src/flows/offer.js — revisado: 2 frases + 1 pergunta, sem link, objeções vagas tratadas
 import { model } from '../model.js';
 import { logEvent } from '../telemetry.js';
 import { getMemory, setMemory } from '../memory.js';
@@ -23,6 +23,11 @@ function benefitByHairType(hairType) {
   return 'cabelo alinhado, macio e com brilho de salão';
 }
 
+// Detecta se o texto é uma dúvida vaga/insegurança → tratamos como objeção leve
+function isDuvidaVaga(text = '') {
+  return /(não sei|nao sei|será que|sera que|tenho dúvida|tenho duvida)/i.test((text || '').toLowerCase());
+}
+
 export async function offer({ text, context, prompts, productPrompt, price = PRICE_PROMO }) {
   const userId   = (context && context.userId) || 'unknown';
   const memory   = await getMemory(userId);
@@ -33,6 +38,14 @@ export async function offer({ text, context, prompts, productPrompt, price = PRI
   const prazoLinha = 'Entrega em até 24h (capitais) ou até 2 dias (demais cidades).';
   const codLinha   = 'Pagamento só no recebimento (COD).';
   const urgencia   = 'Estoque promocional limitado.';
+
+  // Se for dúvida vaga → responde como objeção leve (sem seguir funil)
+  if (isDuvidaVaga(text)) {
+    const resposta = `${nome ? nome + ', ' : ''}fica tranquila 💕 Você só paga quando receber (COD), sem risco nenhum. ` +
+                     `O tratamento é seguro, sem formol, e ${precoLinha}. Quer que eu te mostre mais depoimentos de clientes?`;
+    logEvent({ userId, event: 'objection_tratada', payload: { tipo: 'nao_confio', preview: resposta.slice(0, 120) } });
+    return resposta;
+  }
 
   const sys =
     prompts.persona +
@@ -60,8 +73,8 @@ export async function offer({ text, context, prompts, productPrompt, price = PRI
   let reply = await model.chat(messages, { maxTokens: 180, temperature: 0.55 });
   reply = String(reply || '').trim();
 
-  // Fallback se vier ruim
-  if (!reply || reply.length < 20 || reply.split('.').length > 3) {
+  // Fallback se vier ruim ou contiver link
+  if (!reply || reply.length < 20 || reply.split('.').length > 3 || /https?:\/\//i.test(reply)) {
     reply =
       `${nome ? nome + ', ' : ''}olha só: ${precoLinha}, ` +
       `com ${benefitByHairType(hairType)}. ${codLinha} ${prazoLinha} ${urgencia} ` +

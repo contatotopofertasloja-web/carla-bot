@@ -1,4 +1,4 @@
-// src/flows/close.js — revisado: fechamento persuasivo + pós-venda (cupom)
+// src/flows/close.js — revisado: só manda link em intenção de compra + fidelidade sem link
 import { model } from '../model.js';
 import { logEvent } from '../telemetry.js';
 
@@ -16,42 +16,44 @@ function oneQuestionOnly(answer = '') {
   if (parts.length <= 2) return s.trim();
   return (parts.slice(0, 2).join('?') + (s.endsWith('?') ? '?' : '')).trim();
 }
-
 function detectComprovante(text = '') {
-  const t = (text || '').toLowerCase();
-  return /(paguei|pago|comprovante|print|enviei.*comprovante|mandei.*comprovante)/i.test(t);
+  return /(paguei|pago|comprovante|print|enviei.*comprovante|mandei.*comprovante)/i.test((text||'').toLowerCase());
+}
+// 👇 Intenção de compra (só nesses casos pode mandar link)
+function shouldOfferLink(text = '') {
+  return /(comprar|adquirir|checkout|link|finalizar|fechar pedido|onde pago)/i.test((text||'').toLowerCase());
+}
+// 👇 Perguntas de fidelidade
+function isFidelidade(text = '') {
+  return /(fidelidade|recompra|segunda compra|desconto futuro|cupom)/i.test((text||'').toLowerCase());
 }
 
 export async function closeDeal({ text, context, prompts, productPrompt, price = 170 }) {
   const user = (text || '').trim();
   const userId = (context && context.userId) || 'unknown';
 
-  // Pós-venda: cliente mandou comprovante
+  // Pós-venda
   if (detectComprovante(user)) {
     const sys =
-      prompts.persona +
-      prompts.styleRules +
+      prompts.persona + prompts.styleRules +
       '\n[NUNCA REVELAR IDENTIDADE TÉCNICA]\n' +
       'Você é vendedora humana da TopOfertas Express.\n' +
       '[ETAPA 8 — PÓS-VENDA]\n' +
-      '- Confirme recebimento do print.\n' +
-      '- Agradeça calorosamente.\n' +
-      `- Libere CUPOM fidelidade: ${COUPON_CODE}, válido 3 meses.\n` +
-      '- Termine com 1 pergunta leve.\n' +
+      `Confirme print + agradeça + libere CUPOM fidelidade R$150: ${COUPON_CODE}.` +
+      '\nFinalize com 1 pergunta leve.\n' +
       productPrompt({ price });
 
     const messages = [
       { role: 'system', content: sys },
       { role: 'user', content: `Mensagem: "${user}"` }
     ];
-
     let reply = await model.chat(messages, { maxTokens: 160, temperature: 0.55 });
     reply = oneQuestionOnly(reply);
 
     if (!reply || reply.length < 20) {
-      reply = `Comprovante recebido ✅ Muito obrigada 💕 Seu pedido já foi registrado. ` +
-              `Aqui está seu cupom fidelidade de R$150: ${COUPON_CODE} (válido por 3 meses). ` +
-              `Quer que eu te avise quando o pedido sair para entrega?`;
+      reply = `Comprovante recebido ✅ Muito obrigada 💕 Seu pedido foi registrado. ` +
+              `Aqui está seu cupom fidelidade: ${COUPON_CODE} (válido 3 meses). ` +
+              `Quer que eu te avise quando sair para entrega?`;
     }
 
     logEvent({ userId, event: 'pos_pagamento_enviado', payload: { preview: reply.slice(0, 120) } });
@@ -60,16 +62,25 @@ export async function closeDeal({ text, context, prompts, productPrompt, price =
     return reply;
   }
 
+  // Fidelidade / recompra — não empurra link
+  if (isFidelidade(user)) {
+    return `Na sua recompra você ganha um cupom de R$150 💕 (código: ${COUPON_CODE}), válido por 3 meses.`;
+  }
+
   // Fechamento normal
+  if (!shouldOfferLink(user)) {
+    // Pergunta informativa → responde sem link
+    return "Pode ficar tranquila 💕 O pagamento é só na entrega (COD) e a entrega leva até 24h em capitais ou 2 dias em outras cidades.";
+  }
+
   const sys =
-    prompts.persona +
-    prompts.styleRules +
+    prompts.persona + prompts.styleRules +
     '\n[NUNCA REVELAR IDENTIDADE TÉCNICA]\n' +
     'Você é vendedora humana da TopOfertas Express.\n' +
     '[ETAPA 7 — FECHAMENTO]\n' +
     `Use o link oficial: ${CHECKOUT_LINK}\n` +
-    'Monte mensagem persuasiva: preço promocional, urgência (estoque), prazo (24h capitais / 2 dias demais) e COD.\n' +
-    'No máximo 2 frases + 1 pergunta.\n' +
+    'Mensagem curta: preço promocional, urgência, prazo e COD.\n' +
+    'Máx. 2 frases + 1 pergunta.\n' +
     productPrompt({ price });
 
   const messages = [
@@ -81,12 +92,10 @@ export async function closeDeal({ text, context, prompts, productPrompt, price =
   reply = oneQuestionOnly(reply);
 
   if (!reply || reply.length < 20 || !reply.includes('http')) {
-    reply =
-      `Pra você aproveitar: de R$197 por R$${price}, com entrega rápida e pagamento só na entrega (COD). ` +
-      `Link oficial: ${CHECKOUT_LINK} Quer garantir já pelo valor promocional?`;
+    reply = `Aproveite: de R$197 por R$${price}, com entrega rápida e pagamento só na entrega (COD). ` +
+            `Link oficial: ${CHECKOUT_LINK} Quer garantir já pelo valor promocional?`;
   }
 
   logEvent({ userId, event: 'checkout_enviado', payload: { link: CHECKOUT_LINK } });
-
   return reply;
 }

@@ -1,4 +1,4 @@
-// src/bot.js — FSM completo + captura automática de NOME
+// src/bot.js — FSM completo + ajustes finos (nome, objeções vagas, sem link indevido)
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -13,25 +13,21 @@ import { offer } from "./flows/offer.js";
 import { closeDeal } from "./flows/close.js";
 import { postSale } from "./flows/postsale.js";
 
-// ===== Resolve paths =====
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
-const OBJECTIONS_PATH = path.join(__dirname, "prompts", "objections.json"); // opcional
+const OBJECTIONS_PATH = path.join(__dirname, "prompts", "objections.json");
 
-// ===== Configs =====
 const PRICE_TARGET = Number(process.env.PRICE_TARGET || 170);
 
-// ===== Estados do funil =====
 const STATES = {
-  GREET:  "greet",   // abertura
-  QUALIFY:"qualify", // mapeamento do cabelo
-  DOR:    "dor",     // exploração da dor
-  OFFER:  "offer",   // apresentação de oferta
-  CLOSE:  "close",   // fechamento com link
-  POS:    "pos"      // pós-venda (comprovante/cupom)
+  GREET:  "greet",
+  QUALIFY:"qualify",
+  DOR:    "dor",
+  OFFER:  "offer",
+  CLOSE:  "close",
+  POS:    "pos"
 };
 
-// ===== Helpers =====
 function pick(arr = []) { return arr[Math.floor(Math.random() * arr.length)]; }
 
 function textIndicaMidia(text = "") {
@@ -44,7 +40,7 @@ function respostaMidia() {
   ]);
 }
 
-// Intenções diretas (perguntas secas)
+// Intenções diretas
 function detectDirectIntent(text = "") {
   const t = text.toLowerCase();
   if (/(quantos?\s*ml|ml|quantidade)/i.test(t)) return "ml";
@@ -64,20 +60,11 @@ function directAnswer(intent) {
   return null;
 }
 
-// Objeções — load opcional de arquivo + fallback
+// Objeções
 const DEFAULT_OBJECTIONS = {
-  caro: [
-    "Entendo! Mas dura até 3 meses — sai menos de R$2/dia ✨",
-    "Você só paga quando receber (COD), sem risco 😉"
-  ],
-  medo_estragar: [
-    "Essa é sem formol 🌿 trata enquanto alinha — segura pro fio.",
-    "Pode ficar tranquila: não resseca e não tem cheiro forte."
-  ],
-  nao_confio: [
-    "Pagamento só na entrega 🚚💵 sem risco nenhum.",
-    "Você recebe o produto primeiro e só então paga, combinado?"
-  ]
+  caro: ["Entendo! Mas dura até 3 meses — sai menos de R$2/dia ✨","Você só paga quando receber (COD), sem risco 😉"],
+  medo_estragar: ["Essa é sem formol 🌿 trata enquanto alinha — segura pro fio.","Pode ficar tranquila: não resseca e não tem cheiro forte."],
+  nao_confio: ["Pagamento só na entrega 🚚💵 sem risco nenhum.","Você recebe o produto primeiro e só então paga, combinado?"]
 };
 function loadObjections() {
   try {
@@ -86,7 +73,7 @@ function loadObjections() {
       const json = JSON.parse(raw);
       return json.data || DEFAULT_OBJECTIONS;
     }
-  } catch { /* ignore e usa default */ }
+  } catch {}
   return DEFAULT_OBJECTIONS;
 }
 const OBJECTIONS = loadObjections();
@@ -96,79 +83,46 @@ function detectObjection(text = "") {
   if (/car[oa]|caríssimo|muito caro/.test(t)) return "caro";
   if (/medo|estragar|danificar|quebrar/.test(t)) return "medo_estragar";
   if (/(não|nao)\s*confio|golpe|desconfiad[ao]/.test(t)) return "nao_confio";
+  if (/não sei|nao sei|será que|sera que|tenho dúvida|tenho duvida/.test(t)) return "nao_confio"; // 👈 dúvidas vagas
   return null;
 }
 function answerObjection(kind) {
   return pick(OBJECTIONS[kind] || []);
 }
 
-// Comprovante → pós-venda
 function detectComprovante(text = "") {
   const t = (text || "").toLowerCase();
-  return /(paguei|pago|comprovante|print|enviei.*comprovante|mandei.*comprovante|enviei.*print|mandei.*print)/i.test(t);
+  return /(paguei|pago|comprovante|print|enviei.*comprovante|mandei.*comprovante)/i.test(t);
 }
-
-// Detecta tipo de cabelo (para memória curta)
 function detectHairType(text = "") {
   const m = String(text || "").toLowerCase().match(/liso|ondulad[oa]?|cachead[oa]?|cresp[oa]?/i);
   return m ? m[0] : null;
 }
 
-// === Captura automática de NOME ===
-// Regras simples para PT-BR: "meu nome é X", "sou X", ou um nome curto (1–3 palavras, sem números/links)
+// Captura de nome
 function detectNameCandidate(text = "") {
   const t = String(text || "").trim();
   if (!t) return null;
-
-  // Padrões explícitos
-  const m1 = t.match(/meu\s+nome\s+é\s+([A-Za-zÀ-ÿ'´`^~\-]+\s?[A-Za-zÀ-ÿ'´`^~\-]*)/i);
-  if (m1 && m1[1]) return sanitizeName(m1[1]);
-
-  const m2 = t.match(/eu\s*me\s*chamo\s+([A-Za-zÀ-ÿ'´`^~\-]+\s?[A-Za-zÀ-ÿ'´`^~\-]*)/i);
-  if (m2 && m2[1]) return sanitizeName(m2[1]);
-
-  const m3 = t.match(/^(sou|meu\s+apelido\s+é)\s+([A-Za-zÀ-ÿ'´`^~\-]+\s?[A-Za-zÀ-ÿ'´`^~\-]*)$/i);
-  if (m3 && m3[2]) return sanitizeName(m3[2]);
-
-  // Heurística: mensagem curta de 1–3 palavras, sem dígitos/URL, com inicial maiúscula
-  if (!/https?:\/\//i.test(t) && !/\d/.test(t)) {
-    const words = t.split(/\s+/).filter(Boolean);
-    if (words.length >= 1 && words.length <= 3) {
-      const looksName = words.every(w => /^[A-Za-zÀ-ÿ'´`^~\-]+$/.test(w)) && /^[A-ZÀ-Ý]/.test(words[0]);
-      if (looksName) return sanitizeName(words.map(capitalize).join(" "));
-    }
-  }
-
+  const m1 = t.match(/meu\s+nome\s+é\s+([A-Za-zÀ-ÿ\s]+)/i);
+  if (m1 && m1[1]) return capitalize(m1[1].trim());
+  if (/^sou\s+[A-Za-zÀ-ÿ]+/i.test(t)) return capitalize(t.split(/\s+/)[1]);
+  if (/^[A-ZÀ-Ý][a-zà-ÿ]+$/.test(t)) return capitalize(t);
   return null;
-}
-function sanitizeName(n) {
-  return String(n || "")
-    .replace(/[^A-Za-zÀ-ÿ'´`^~\-\s]/g, "")
-    .replace(/\s+/g, " ")
-    .trim()
-    .split(" ")
-    .map(capitalize)
-    .join(" ");
 }
 function capitalize(s = "") { return s ? s[0].toUpperCase() + s.slice(1) : s; }
 
-// ===== BOT (FSM) =====
 export const bot = {
   async handleMessage({ userId = "unknown", text = "", context = {} }) {
     const mem = await getMemory(userId);
     let state = mem?.state || STATES.GREET;
     const jaEnviouFotoAbertura = Boolean(mem?.welcomed);
 
-    // Persistir hairType rapidamente se aparecer
     const hairTypeDetected = detectHairType(text);
-    if (hairTypeDetected) {
-      await setMemory(userId, { ...(mem || {}), hairType: hairTypeDetected });
-    }
+    if (hairTypeDetected) await setMemory(userId, { ...(mem || {}), hairType: hairTypeDetected });
 
-    // Captura automática de nome (se a abertura pediu nome ou ainda não temos)
     const nameCandidate = detectNameCandidate(text);
     if (nameCandidate && (!mem?.name || mem?.askedName)) {
-      await setMemory(userId, { ...(mem || {}), name: nameCandidate, askedName: false, updatedAt: Date.now() });
+      await setMemory(userId, { ...(mem || {}), name: nameCandidate, askedName: false });
     }
 
     let reply = "";
@@ -177,49 +131,53 @@ export const bot = {
       // 0) Mídia
       if (context?.hasMedia || textIndicaMidia(text)) {
         reply = respostaMidia();
-        await setMemory(userId, { state, lastUserText: text, welcomed: jaEnviouFotoAbertura, updatedAt: Date.now() });
+        await setMemory(userId, { state, lastUserText: text, welcomed: jaEnviouFotoAbertura });
         return reply;
       }
 
-      // 1) Intenções diretas (respostas secas)
+      // 1) Pergunta direta sobre nome
+      if (/qual.*meu.*nome|lembra.*meu.*nome/i.test(text)) {
+        if (mem?.name) return `Claro que lembro 💕 Seu nome é ${mem.name}!`;
+        return "Ainda não me contou seu nome 💕 qual é?";
+      }
+
+      // 2) Intenções diretas
       const intent = detectDirectIntent(text);
       const direct = directAnswer(intent);
       if (direct) {
         const prefix = !jaEnviouFotoAbertura ? "[ENVIAR_FOTO_PRODUTO:Essa é a Progressiva Vegetal 🌿 ✨]\n" : "";
         const out = (prefix + direct).trim();
-        await setMemory(userId, { state, lastUserText: text, welcomed: true, updatedAt: Date.now() });
+        await setMemory(userId, { state, lastUserText: text, welcomed: true });
         return out;
       }
 
-      // 2) Objeções (tratadas antes de avançar no funil)
+      // 3) Objeções
       const obj = detectObjection(text);
       if (obj) {
         const ans = answerObjection(obj);
-        await setMemory(userId, { state, lastUserText: text, welcomed: jaEnviouFotoAbertura, updatedAt: Date.now() });
+        await setMemory(userId, { state, lastUserText: text, welcomed: jaEnviouFotoAbertura });
         return ans;
       }
 
-      // 3) Comprovante → vai direto para pós-venda (POS)
+      // 4) Comprovante → pós-venda
       if (detectComprovante(text)) {
         reply = await postSale({ text, context: { ...(context||{}), userId }, prompts, productPrompt, price: PRICE_TARGET });
         state = STATES.POS;
-        await setMemory(userId, { state, lastUserText: text, welcomed: true, updatedAt: Date.now() });
+        await setMemory(userId, { state, lastUserText: text, welcomed: true });
         return reply;
       }
 
-      // 4) FSM: fluxo por estado
+      // 5) FSM
       if (state === STATES.GREET) {
         reply = await greet({ text, context, prompts, productPrompt });
         state = STATES.QUALIFY;
       }
       else if (state === STATES.QUALIFY) {
-        // Se já detectou tipo de cabelo, avança e pergunta de dor diretamente
-        if (hairTypeDetected || /liso|ondulad|cachead|cresp/i.test(text)) {
+        if (hairTypeDetected) {
           const nome = (mem?.name || nameCandidate) ? `${mem?.name || nameCandidate}, ` : "";
           reply = `${nome}me conta: qual a maior dificuldade que ele te dá? Frizz, volume ou alinhamento?`;
           state = STATES.DOR;
         } else {
-          // Ainda não temos tipo — usa flow pra perguntar uma única vez
           reply = await qualify({ text, context, prompts, productPrompt });
           state = STATES.QUALIFY;
         }
@@ -234,14 +192,13 @@ export const bot = {
       }
       else if (state === STATES.CLOSE) {
         reply = await closeDeal({ text, context, prompts, productPrompt, price: PRICE_TARGET });
-        state = STATES.CLOSE; // fica em CLOSE até detectar comprovante
+        state = STATES.CLOSE;
       }
       else if (state === STATES.POS) {
         reply = await postSale({ text, context: { ...(context||{}), userId }, prompts, productPrompt, price: PRICE_TARGET });
         state = STATES.POS;
       }
 
-      // 5) Foto automática na primeira resposta
       if (!jaEnviouFotoAbertura && state !== STATES.GREET) {
         reply = "[ENVIAR_FOTO_PRODUTO:Essa é a Progressiva Vegetal 🌿 ✨]\n" + String(reply || "");
       }
@@ -251,13 +208,11 @@ export const bot = {
       reply = "Dei uma travadinha aqui, pode repetir? 💕";
     }
 
-    // 6) Persistência
     await setMemory(userId, {
-      ...(await getMemory(userId)), // garante merge
+      ...(await getMemory(userId)),
       state,
       lastUserText: text,
-      welcomed: true,
-      updatedAt: Date.now()
+      welcomed: true
     });
 
     return String(reply || "").trim();

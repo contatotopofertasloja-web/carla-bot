@@ -1,4 +1,4 @@
-// src/flows/greet.js — abertura calorosa + pedir nome (blindado)
+// src/flows/greet.js — revisado: abertura calorosa + pedir nome
 import { model } from '../model.js';
 import { logEvent } from '../telemetry.js';
 import { setMemory } from '../memory.js';
@@ -13,23 +13,22 @@ function oneQuestionOnly(answer = '') {
 
 export async function greet({ text, context, prompts, productPrompt, price = 170 }) {
   const userId = (context && context.userId) || 'unknown';
-
   const sys =
     prompts.persona +
     prompts.styleRules +
     '\n[NUNCA REVELAR IDENTIDADE TÉCNICA]\n' +
     'Você é vendedora humana da TopOfertas Express.\n' +
     '[ETAPA 1 — ABERTURA]\n' +
-    '- Responda em até 2 frases curtas.\n' +
+    '- Responda em 2 frases curtas.\n' +
     '- Seja calorosa, empática e use emojis suaves.\n' +
-    '- Apresente o produto de forma sutil, sem parecer forçado.\n' +
+    '- Apresente o produto de forma sutil.\n' +
     '- Peça o NOME do cliente de forma natural (ex.: “E o seu nome, qual é? 💕”).\n' +
-    '- Termine sempre com apenas 1 pergunta.\n' +
+    '- Finalize sempre com 1 pergunta curta.\n' +
     productPrompt({ price });
 
   const userMsg =
     `Mensagem do cliente: "${(text || '').trim()}"\n` +
-    'Monte a resposta de abertura em 2 frases + 1 pergunta, pedindo o nome do cliente.';
+    'Monte uma resposta de abertura em 2 frases + 1 pergunta, pedindo o nome do cliente.';
 
   const messages = [
     { role: 'system', content: sys },
@@ -39,20 +38,15 @@ export async function greet({ text, context, prompts, productPrompt, price = 170
   let reply = await model.chat(messages, { maxTokens: 160, temperature: 0.6 });
   reply = oneQuestionOnly(String(reply || '').trim());
 
-  // 🚑 Fallback se vier vazio ou curto
   if (!reply || reply.length < 20) {
     reply = "Oi! Seja muito bem-vinda 💕 Eu sou a Carla da TopOfertas Express. Qual é o seu nome?";
   }
 
-  // 🔐 Marca que já pediu o nome (pra personalizar nas próximas etapas)
+  // 🔐 Salva flag de que já pediu o nome (pra personalizar depois)
   await setMemory(userId, { askedName: true, updatedAt: Date.now() });
 
   // 📊 Telemetry
-  logEvent({
-    userId,
-    event: 'abertura_enviada',
-    payload: { preview: reply.slice(0, 120) }
-  });
+  logEvent({ userId, event: 'abertura_enviada', payload: { preview: reply.slice(0, 120) } });
 
   return reply;
 }
